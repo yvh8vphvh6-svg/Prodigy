@@ -111,6 +111,22 @@
   .toast.go{ animation:toastIn 3s cubic-bezier(.2,.8,.2,1); }
   @keyframes toastIn{ 0%{ opacity:0; transform:translate(-50%,-80px) } 12%,80%{ opacity:1; transform:translate(-50%,0) } 100%{ opacity:0; transform:translate(-50%,-80px) } }
 
+  /* ---------- cram mode ---------- */
+  #cram{ overflow:auto; padding:16px max(16px,env(safe-area-inset-left)) calc(16px + env(safe-area-inset-bottom)); }
+  .cramwrap{ width:min(820px,100%); margin:0 auto; display:flex; flex-direction:column; gap:14px; }
+  .cramtop{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-family:var(--mono); font-size:12px; }
+  .cramtop .chip.good{ color:var(--reagent); }
+  .cramtop .btn{ margin-left:auto; padding:8px 14px; font-size:11px; }
+  #cram .qpanel{ border:1px solid var(--line2); border-radius:14px; }
+  .cramsummary{ background:var(--panel); border:1px solid var(--line2); border-radius:14px; padding:20px; }
+  .cramsummary h2{ margin:0 0 8px; font-size:26px; letter-spacing:-.01em; }
+  .cramsummary .nums{ font-family:var(--mono); font-size:13px; color:var(--muted); letter-spacing:.06em; margin-bottom:8px; }
+  .cramsummary .nums b{ color:var(--gold); }
+  .missed{ display:flex; flex-direction:column; gap:12px; margin:12px 0; }
+  .missed .mq{ border-left:2px solid var(--hplow); padding-left:12px; font-size:14px; line-height:1.55; }
+  .missed .mq .ans{ color:var(--reagent); }
+  .missed .mq .why{ color:var(--muted); }
+
   /* ---------- battle ---------- */
   #battle{ padding:0; }
   .arena{ position:relative; flex:1; min-height:0; display:flex; flex-direction:column;
@@ -229,8 +245,9 @@
     <p class="lede">Answer to cast. Every right answer hits the enemy; every miss hits you.
       Beat it before your vitals flatline. Pick who you're taking into the ward.</p>
     <div class="subtabs" id="subtabs" aria-label="choose a subject"></div>
+    <button class="btn" id="cramBtn">📖 cram mode — rapid-fire drill, no battle</button>
     <div class="roster" id="roster"></div>
-    <div class="eyebrow" style="opacity:.6">↑ tap a student to start · you can customize looks later</div>
+    <div class="eyebrow" style="opacity:.6">↑ tap a student to battle · or cram without combat</div>
   </section>
 
   <!-- ===== BATTLE ===== -->
@@ -273,6 +290,27 @@
       <div class="choices" id="choices"></div>
       <div class="rationale" id="rationale"></div>
       <div class="nextrow" id="nextRow"><button class="btn primary" id="nextBtn">continue ▸</button></div>
+    </div>
+  </section>
+
+  <!-- ===== CRAM MODE ===== -->
+  <section id="cram" class="screen hidden">
+    <div class="cramwrap">
+      <div class="cramtop">
+        <span class="chip" id="cramSubj">ALL</span>
+        <span class="chip good" id="cramScore">0 / 0</span>
+        <span class="chip" id="cramAcc">—%</span>
+        <span class="chip" id="cramClock">0:00</span>
+        <button class="btn ghost" id="cramEnd">end session</button>
+      </div>
+      <div class="qpanel" id="cramQPanel">
+        <div class="qtop"><span class="element" id="cramElement" style="--el:var(--reagent)">—</span></div>
+        <div class="q" id="cramQText">—</div>
+        <div class="choices" id="cramChoices"></div>
+        <div class="rationale" id="cramRationale"></div>
+        <div class="nextrow" id="cramNextRow"><button class="btn primary" id="cramNext">next ▸</button></div>
+      </div>
+      <div class="cramsummary hidden" id="cramSummary"></div>
     </div>
   </section>
 
@@ -828,13 +866,118 @@ function colorVal(c){ // resolve a var(--x) to a real color for dynamically-crea
   return c;
 }
 
-/* keyboard: A–D to answer, Enter to continue */
+/* =====================================================================
+   5) CRAM MODE — rapid-fire drill: no HP, no enemies, no death.
+   Same subject filter + question queue as battle; correct answers still
+   count toward lifetime unlock progress.
+   ===================================================================== */
+const CRAM = { seen:0, correct:0, missed:[], start:0, clock:null, answering:false };
+
+function fmtTime(ms){ const s=Math.floor(ms/1000); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+
+function startCram(){
+  SFX.init(); SFX.resume();
+  refillQueue(); // respects the selected subject tab
+  CRAM.seen=0; CRAM.correct=0; CRAM.missed=[]; CRAM.start=performance.now(); CRAM.answering=false;
+  clearInterval(CRAM.clock);
+  CRAM.clock = setInterval(renderCramTop, 1000);
+  $('#cramSubj').textContent = subjectSel.toUpperCase();
+  $('#cramSummary').classList.add('hidden');
+  $('#cramQPanel').classList.remove('hidden');
+  $('#select').classList.add('hidden');
+  $('#cram').classList.remove('hidden');
+  renderCramTop();
+  loadCramQ();
+}
+
+function renderCramTop(){
+  $('#cramScore').textContent = `${CRAM.correct} / ${CRAM.seen}`;
+  $('#cramAcc').textContent = CRAM.seen ? Math.round(CRAM.correct/CRAM.seen*100)+'%' : '—%';
+  $('#cramClock').textContent = fmtTime(performance.now()-CRAM.start);
+}
+
+function loadCramQ(){
+  if(S.qi >= S.queue.length){ endCram(); return; } // pool exhausted → summary
+  CRAM.answering = false;
+  const q = S.queue[S.qi];
+  const el = ELEMENTS[q.subject] || ELEMENTS["A&P"];
+  const badge = $('#cramElement');
+  badge.textContent = `${q.subject} · ${q.chapter}`; badge.style.setProperty('--el', el.css);
+  $('#cramQText').textContent = q.q;
+  const wrap = $('#cramChoices'); wrap.innerHTML='';
+  const keys=['A','B','C','D'];
+  q.choices.forEach((c,i)=>{
+    const b=document.createElement('button'); b.className='choice'; b.type='button';
+    b.innerHTML=`<span class="k">${keys[i]}</span><span>${c}</span>`;
+    b.addEventListener('click', ()=>cramAnswer(i));
+    wrap.appendChild(b);
+  });
+  $('#cramRationale').classList.remove('show'); $('#cramRationale').innerHTML='';
+  $('#cramNextRow').classList.remove('show');
+}
+
+function cramAnswer(i){
+  if(CRAM.answering) return; CRAM.answering = true;
+  const q = S.queue[S.qi];
+  const correct = i === q.answer;
+  document.querySelectorAll('#cramChoices .choice').forEach((el,idx)=>{
+    el.classList.add('lock');
+    if(idx===q.answer) el.classList.add('correct');
+    if(idx===i && !correct) el.classList.add('wrong');
+  });
+  CRAM.seen++;
+  if(correct){ CRAM.correct++; SFX.hit(false); bumpProgress('corrects', 1); } // cramming earns characters too
+  else { CRAM.missed.push(q); SFX.hurt(); }
+  const r=$('#cramRationale');
+  r.innerHTML = `<b>${correct?'✓ Correct — ':'✗ Missed — '}</b>${q.why}`;
+  r.classList.add('show');
+  renderCramTop();
+  $('#cramNextRow').classList.add('show'); $('#cramNext').focus();
+}
+
+function endCram(){
+  clearInterval(CRAM.clock);
+  const acc = CRAM.seen ? Math.round(CRAM.correct/CRAM.seen*100) : 0;
+  const missedHtml = CRAM.missed.length
+    ? `<div class="eyebrow">review these</div>
+       <div class="missed">${CRAM.missed.map(q=>`
+         <div class="mq">${q.q}<br><span class="ans">✓ ${q.choices[q.answer]}</span><br><span class="why">${q.why}</span></div>`).join('')}</div>`
+    : `<p style="color:var(--muted)">Nothing missed — perfect session. 🎯</p>`;
+  $('#cramQPanel').classList.add('hidden');
+  $('#cramNextRow').classList.remove('show'); // so Enter can't advance a finished session
+  const sum=$('#cramSummary');
+  sum.innerHTML = `
+    <h2>Session complete</h2>
+    <div class="nums">SCORE <b>${CRAM.correct} / ${CRAM.seen}</b> · ACCURACY <b>${acc}%</b> · TIME <b>${fmtTime(performance.now()-CRAM.start)}</b></div>
+    ${missedHtml}
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:16px">
+      <button class="btn primary" id="cramAgain">cram again ▸</button>
+      <button class="btn ghost" id="cramQuit">back to select</button>
+    </div>`;
+  sum.classList.remove('hidden');
+  $('#cramAgain').addEventListener('click', startCram);
+  $('#cramQuit').addEventListener('click', ()=>{ $('#cram').classList.add('hidden'); buildRoster(); $('#select').classList.remove('hidden'); });
+}
+
+$('#cramBtn').addEventListener('click', startCram);
+$('#cramNext').addEventListener('click', ()=>{ S.qi++; loadCramQ(); });
+$('#cramEnd').addEventListener('click', endCram);
+
+/* keyboard: A–D to answer, Enter/Space to continue (battle + cram) */
 document.addEventListener('keydown', e=>{
-  if($('#battle').classList.contains('hidden')) return;
+  const inBattle = !$('#battle').classList.contains('hidden');
+  const inCram = !inBattle && !$('#cram').classList.contains('hidden');
+  if(!inBattle && !inCram) return;
   const map={a:0,b:1,c:2,d:3};
   const k=e.key?.toLowerCase();
-  if(map[k]!==undefined && !S.answering){ const b=document.querySelectorAll('.choice')[map[k]]; if(b) b.click(); }
-  if((e.key==='Enter'||e.key===' ') && $('#nextRow').classList.contains('show')){ e.preventDefault(); $('#nextBtn').click(); }
+  const busy = inBattle ? S.answering : CRAM.answering;
+  if(map[k]!==undefined && !busy){
+    const b=document.querySelectorAll((inBattle?'#choices':'#cramChoices')+' .choice')[map[k]]; if(b) b.click();
+  }
+  const nextRow = inBattle ? '#nextRow' : '#cramNextRow';
+  if((e.key==='Enter'||e.key===' ') && $(nextRow).classList.contains('show')){
+    e.preventDefault(); $(inBattle?'#nextBtn':'#cramNext').click();
+  }
 });
 
 buildSubjectTabs();
