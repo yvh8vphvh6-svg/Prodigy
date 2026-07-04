@@ -159,6 +159,29 @@
   .notepane .saved{ font-family:var(--mono); font-size:10px; letter-spacing:.08em; color:var(--hp); opacity:0; transition:opacity .2s; }
   .notepane .saved.show{ opacity:1; }
 
+  /* ---------- mind map ---------- */
+  #mindmap{ position:relative; overflow:hidden; }
+  #mapCanvas{ position:absolute; inset:0; width:100%; height:100%; touch-action:none; cursor:grab; display:block; }
+  #mapCanvas:active{ cursor:grabbing; }
+  .mapbar{ position:absolute; top:0; left:0; right:0; z-index:2; display:flex; gap:10px; align-items:center;
+    padding:12px max(12px,env(safe-area-inset-left)); pointer-events:none; }
+  .mapbar .title{ font-family:var(--mono); font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  .mapbar .btn{ pointer-events:auto; padding:8px 12px; font-size:11px; }
+  .mapbar .spacer{ flex:1; }
+  .mapzoom{ position:absolute; right:12px; bottom:calc(12px + env(safe-area-inset-bottom)); z-index:2; display:flex; flex-direction:column; gap:6px; }
+  .mapzoom button{ pointer-events:auto; width:38px; height:38px; border-radius:9px; border:1px solid var(--line2);
+    background:var(--panel2); color:var(--text); font-size:18px; cursor:pointer; font-family:var(--mono); }
+  .mapzoom button:hover{ border-color:var(--reagent); }
+  .maplegend{ position:absolute; left:12px; bottom:calc(12px + env(safe-area-inset-bottom)); z-index:2;
+    font-family:var(--mono); font-size:10px; letter-spacing:.04em; color:var(--muted);
+    background:rgba(10,15,24,.72); border:1px solid var(--line); border-radius:10px; padding:10px 12px; line-height:1.7; pointer-events:none; }
+  .maplegend b{ color:var(--text); font-weight:400; }
+  .maplegend .dot{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  .maplegend .d-un{ border:1.5px solid var(--dim); }
+  .maplegend .d-read{ border:1.5px solid var(--reagent); }
+  .maplegend .d-mast{ background:var(--reagent); box-shadow:0 0 6px var(--reagent); }
+  .maplegend .d-weak{ background:var(--hplow); box-shadow:0 0 6px var(--hplow); }
+
   /* ---------- battle ---------- */
   #battle{ padding:0; }
   .arena{ position:relative; flex:1; min-height:0; display:flex; flex-direction:column;
@@ -280,6 +303,7 @@
     <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center">
       <button class="btn" id="cramBtn">📖 cram mode — rapid-fire drill</button>
       <button class="btn" id="libBtn">📚 library — read &amp; take notes</button>
+      <button class="btn" id="mapBtn">🕸 mind map — your knowledge graph</button>
     </div>
     <div class="roster" id="roster"></div>
     <div class="eyebrow" style="opacity:.6">↑ tap a student to battle · or study without combat</div>
@@ -386,6 +410,28 @@
         </div>
         <div class="cramsummary hidden" id="libResult"></div>
       </div>
+    </div>
+  </section>
+
+  <!-- ===== MIND MAP MODE ===== -->
+  <section id="mindmap" class="screen hidden">
+    <canvas id="mapCanvas"></canvas>
+    <div class="mapbar">
+      <span class="title">🕸 knowledge map</span>
+      <span class="spacer"></span>
+      <button class="btn ghost" id="mapReset">reset layout</button>
+      <button class="btn ghost" id="mapQuit">back to select</button>
+    </div>
+    <div class="maplegend">
+      <div><span class="dot d-un"></span><b>untouched</b></div>
+      <div><span class="dot d-read"></span><b>lesson read</b></div>
+      <div><span class="dot d-mast"></span><b>quiz passed</b></div>
+      <div><span class="dot d-weak"></span><b>needs review</b></div>
+      <div style="margin-top:4px; opacity:.7">drag nodes · scroll to zoom · tap to study</div>
+    </div>
+    <div class="mapzoom">
+      <button id="mapZoomIn" aria-label="zoom in">+</button>
+      <button id="mapZoomOut" aria-label="zoom out">−</button>
     </div>
   </section>
 
@@ -543,6 +589,93 @@ Breathing is driven by the diaphragm, a dome-shaped muscle beneath the lungs. Wh
   },
 ];
 
+/* =====================================================================
+   CONCEPT GRAPH — nodes for the Mind Map. Each node is a concept that has
+   a quiz behind it, generated from two sources:
+     • Library LESSONS (curated reading + quiz)
+     • every (subject, chapter) in QUESTION_BANK not already covered by a
+       lesson (quiz = that chapter's questions)
+   The 3 seeded lessons map onto their chapters via LESSON_CHAPTER so we
+   don't get duplicate "Cells" / "Cardiovascular" / "Respiratory" nodes.
+
+   EDGES are hand-wired in CONCEPT_LINKS below — the ONE place to add or
+   remove related-concept links. Keys and values are concept ids:
+     • lesson concepts use the lesson's id:  "ap-cell", "ap-cardio", "ap-resp"
+     • chapter concepts use "Subject/Chapter": "Biology/Cells", "Math/Dosage"
+   Links are bidirectional (listing A→B also draws B→A).
+   ===================================================================== */
+const LESSON_CHAPTER = { "ap-cell":"Cells", "ap-cardio":"Cardiovascular", "ap-resp":"Respiratory" };
+const CHAPTER_PLACEHOLDER = "No reading has been written for this concept yet — it's quiz-only.\n\nTo attach reading, add a lesson for it to the LESSONS array (match its subject and give it a matching chapter). Until then, take the quiz to test yourself, and jot notes here.";
+
+const CONCEPTS = [];
+const CONCEPT_BY_ID = {};
+const CONCEPT_BY_CHAPTER = {}; // "Subject/Chapter" -> concept id
+(function buildConcepts(){
+  LESSONS.forEach(l=>{
+    const chapter = l.chapter || LESSON_CHAPTER[l.id] || null;
+    const c = { id:l.id, title:l.title, subject:l.subject, chapter, lessonId:l.id, quiz:l.quiz, related:[] };
+    CONCEPTS.push(c); CONCEPT_BY_ID[c.id]=c;
+    if(chapter) CONCEPT_BY_CHAPTER[`${l.subject}/${chapter}`]=c.id;
+  });
+  const chapMap = {};
+  QUESTION_BANK.forEach(q=>{
+    const key=`${q.subject}/${q.chapter}`;
+    (chapMap[key]=chapMap[key]||{subject:q.subject,chapter:q.chapter,qs:[]}).qs.push(q);
+  });
+  Object.keys(chapMap).forEach(key=>{
+    if(CONCEPT_BY_CHAPTER[key]) return; // already a lesson concept
+    const {subject,chapter,qs}=chapMap[key];
+    const c={ id:key, title:chapter, subject, chapter, lessonId:null,
+              quiz:qs.map(q=>({q:q.q,choices:q.choices,answer:q.answer,why:q.why})), related:[] };
+    CONCEPTS.push(c); CONCEPT_BY_ID[key]=c; CONCEPT_BY_CHAPTER[key]=key;
+  });
+})();
+
+/* ---- HAND-WIRED EDGES — edit these to reshape the graph ---- */
+const CONCEPT_LINKS = {
+  // A&P
+  "ap-cell":["Biology/Cells","Biology/Cellular Energy","A&P/Tissues"],
+  "ap-cardio":["A&P/Blood","ap-resp","A&P/Homeostasis"],
+  "ap-resp":["A&P/Blood","Chemistry/States"],
+  "A&P/Blood":["Biology/Cellular Energy"],
+  "A&P/Nervous":["A&P/Endocrine","A&P/Muscular"],
+  "A&P/Muscular":["A&P/Skeletal"],
+  "A&P/Renal":["Chemistry/Tonicity","A&P/Homeostasis"],
+  "A&P/Endocrine":["A&P/Homeostasis"],
+  "A&P/Genetics":["Biology/Genetics","Biology/DNA & RNA"],
+  "A&P/Digestive":["Biology/Enzymes","Chemistry/Reactions"],
+  "A&P/Integumentary":["A&P/Homeostasis"],
+  // Biology
+  "Biology/Cells":["Biology/Cell Division","Biology/Transport"],
+  "Biology/DNA & RNA":["Biology/Protein Synthesis","Biology/Genetics"],
+  "Biology/Protein Synthesis":["Biology/Genetics"],
+  "Biology/Cell Division":["Biology/Genetics"],
+  "Biology/Cellular Energy":["Biology/Enzymes"],
+  "Biology/Enzymes":["Chemistry/Reactions"],
+  "Biology/Transport":["Chemistry/Tonicity","Chemistry/Water"],
+  // Chemistry
+  "Chemistry/Atoms":["Chemistry/Bonds"],
+  "Chemistry/Bonds":["Chemistry/Reactions","Chemistry/Solutions"],
+  "Chemistry/Acids & Bases":["Chemistry/Water"],
+  "Chemistry/Water":["Chemistry/Solutions","Chemistry/States"],
+  "Chemistry/Solutions":["Chemistry/Tonicity"],
+  // Math
+  "Math/Metric Conversions":["Math/Dosage","Chemistry/Solutions"],
+  "Math/Dosage":["Math/Proportions","Math/Roman Numerals"],
+  "Math/Percentages":["Math/Decimals & Percents","Math/Fractions","Math/Statistics"],
+  "Math/Proportions":["Math/Fractions"],
+  "Math/Order of Operations":["Math/Percentages"],
+};
+(function wireLinks(){
+  Object.keys(CONCEPT_LINKS).forEach(a=>{
+    CONCEPT_LINKS[a].forEach(b=>{
+      if(!CONCEPT_BY_ID[a] || !CONCEPT_BY_ID[b]) return;
+      if(!CONCEPT_BY_ID[a].related.includes(b)) CONCEPT_BY_ID[a].related.push(b);
+      if(!CONCEPT_BY_ID[b].related.includes(a)) CONCEPT_BY_ID[b].related.push(a);
+    });
+  });
+})();
+
 /* subject → spell (color encodes the element) */
 const ELEMENTS = {
   "A&P":       {spell:"Vitals Surge",  css:"var(--vitals)"},
@@ -598,12 +731,12 @@ const CHARACTERS = [
 /* ---- lifetime study progress + unlocks (localStorage; survives closing the tab) ---- */
 const SAVE_KEY = "clinicalQuestSave";
 function loadMeta(){
-  const fresh = { unlocked:[], lastChar:null, notes:{}, lessonsDone:[],
+  const fresh = { unlocked:[], lastChar:null, notes:{}, lessonsDone:[], concepts:{},
                   progress:{corrects:0, wins:0, bestStreak:0, bestTier:0, bestLevel:1} };
   try{
     const m = JSON.parse(localStorage.getItem(SAVE_KEY)) || {};
     return { unlocked:m.unlocked||[], lastChar:m.lastChar||null,
-             notes:m.notes||{}, lessonsDone:m.lessonsDone||[],
+             notes:m.notes||{}, lessonsDone:m.lessonsDone||[], concepts:m.concepts||{},
              progress:Object.assign(fresh.progress, m.progress) };
   }catch(e){ return fresh; }
 }
@@ -626,6 +759,21 @@ function checkUnlocks(){
   });
 }
 function showToast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.remove('go'); void t.offsetWidth; t.classList.add('go'); }
+
+/* ---- per-concept mastery (drives Mind Map node state; persisted) ---- */
+function conceptForQuestion(q){ return CONCEPT_BY_CHAPTER[`${q.subject}/${q.chapter}`] || null; }
+function conceptRec(id){ return (META.concepts[id] = META.concepts[id] || {right:0, wrong:0}); }
+function tallyConcept(id, correct){ if(!id) return; const c=conceptRec(id); if(correct) c.right++; else c.wrong++; saveMeta(); }
+function markConceptRead(id){ if(!id) return; conceptRec(id).read = true; saveMeta(); }
+function markConceptPassed(id){ if(!id) return; conceptRec(id).passed = true; saveMeta(); }
+/* untouched → read → mastered, but a concept you keep missing flags 'weak' */
+function conceptState(id){
+  const c = META.concepts[id] || {}; const wrong=c.wrong||0, right=c.right||0;
+  if(wrong>=3 && wrong>right) return 'weak';
+  if(c.passed || META.lessonsDone.includes(id)) return 'mastered';
+  if(c.read) return 'read';
+  return 'untouched';
+}
 
 const ENEMIES = ["Pop-Quiz Gremlin","The Cram Golem","Clinical-Skills Ogre","Pharm Hydra","Anatomy Behemoth","Final Boss: The Proctor"];
 const ENEMY_COLORS = ["#ff6b3d","#c04bd6","#4b8bff","#e0b83a","#4be089","#ff3d5e"];
@@ -884,6 +1032,7 @@ function resolve(choiceIndex){
     S.enemy.hp = Math.max(0, S.enemy.hp - dmg);
     S.player.streak++;
     bumpProgress('corrects', 1); bumpProgress('bestStreak', S.player.streak, true);
+    tallyConcept(conceptForQuestion(q), true); // feed the knowledge map
     const el = ELEMENTS[q.subject] || ELEMENTS["A&P"];
     castSpell(el.css, ()=>{
       SFX.hit(crit);
@@ -896,6 +1045,7 @@ function resolve(choiceIndex){
     showRationale(q, true);
   } else {
     S.player.streak = Math.floor(S.player.streak/2); // decay, don't zero — one miss shouldn't collapse the multiplier
+    tallyConcept(conceptForQuestion(q), false); // feed the knowledge map
     let dmg = Math.round(S.enemy.atk * (0.9 + Math.random()*0.2));
     if(S.player.buff.type==="guard") dmg = Math.round(dmg * (1 - S.player.buff.pct));
     S.player.hp = Math.max(0, S.player.hp - dmg);
@@ -1077,6 +1227,7 @@ function cramAnswer(i){
   CRAM.seen++;
   if(correct){ CRAM.correct++; SFX.hit(false); bumpProgress('corrects', 1); } // cramming earns characters too
   else { CRAM.missed.push(q); SFX.hurt(); }
+  tallyConcept(conceptForQuestion(q), correct); // feed the knowledge map
   const r=$('#cramRationale');
   r.innerHTML = `<b>${correct?'✓ Correct — ':'✗ Missed — '}</b>${q.why}`;
   r.classList.add('show');
@@ -1117,7 +1268,7 @@ $('#cramEnd').addEventListener('click', endCram);
    Notes + completion persist in META (localStorage). Quiz correct
    answers count toward the same lifetime unlock progress.
    ===================================================================== */
-const LIB = { lesson:null, qi:0, correct:0, answering:false, noteTimer:null };
+const LIB = { lesson:null, qi:0, correct:0, answering:false, noteTimer:null, returnTo:'library' };
 const PASS_MARK = 0.7; // 70% to mark a lesson complete
 
 function escapeHtml(s){ return s.replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
@@ -1127,10 +1278,16 @@ function bodyToHtml(body){ // blank line → new paragraph, single newline → <
 
 function openLibrary(){
   SFX.init(); SFX.resume();
+  LIB.returnTo = 'library';
   $('#libSubj').textContent = subjectSel.toUpperCase();
   $('#select').classList.add('hidden');
   $('#library').classList.remove('hidden');
   showLessonList();
+}
+/* leave the reader/result back to wherever we came from (lesson list, or the map) */
+function leaveLibraryContext(){
+  if(LIB.returnTo==='map'){ $('#library').classList.add('hidden'); openMap(); }
+  else showLessonList();
 }
 function showLessonList(){
   $('#libReader').classList.add('hidden');
@@ -1154,11 +1311,13 @@ function showLessonList(){
 }
 function openLesson(l){
   LIB.lesson = l;
+  markConceptRead(l.id); // opening the reading marks the concept "read"
   const el = ELEMENTS[l.subject] || ELEMENTS["A&P"];
   const pane = $('#readPane'); pane.style.setProperty('--el', el.css);
   pane.innerHTML = `<div class="kicker">${l.subject} · lesson</div><h2>${l.title}</h2>${bodyToHtml(l.body)}`;
   pane.scrollTop = 0;
   const box = $('#noteBox'); box.value = META.notes[l.id] || '';
+  $('#libBack').textContent = LIB.returnTo==='map' ? '◂ back to map' : '◂ all lessons';
   $('#lessonList').classList.add('hidden');
   $('#libQuiz').classList.add('hidden');
   $('#libReader').classList.remove('hidden');
@@ -1207,6 +1366,7 @@ function libAnswer(i){
   });
   if(correct){ LIB.correct++; SFX.hit(false); bumpProgress('corrects', 1); } // quiz correct → lifetime unlock progress
   else SFX.hurt();
+  tallyConcept(LIB.lesson.id, correct); // feed the knowledge map
   const r=$('#libRationale');
   r.innerHTML=`<b>${correct?'✓ Correct — ':'✗ Missed — '}</b>${q.why}`;
   r.classList.add('show');
@@ -1219,8 +1379,11 @@ function nextLibQ(){
 function finishLessonQuiz(){
   const l=LIB.lesson, total=l.quiz.length, acc=Math.round(LIB.correct/total*100);
   const passed = LIB.correct/total >= PASS_MARK;
-  if(passed && !META.lessonsDone.includes(l.id)){ META.lessonsDone.push(l.id); saveMeta(); }
-  if(passed) SFX.win();
+  if(passed){
+    if(!META.lessonsDone.includes(l.id)){ META.lessonsDone.push(l.id); saveMeta(); }
+    markConceptPassed(l.id); // light up + glow on the mind map
+    SFX.win();
+  }
   $('#libQPanel').classList.add('hidden'); $('#libNextRow').classList.remove('show');
   const res=$('#libResult');
   res.innerHTML = `
@@ -1229,18 +1392,201 @@ function finishLessonQuiz(){
     <p style="color:var(--muted); font-size:14px">${passed?'Marked complete and saved. Your correct answers counted toward unlocks.':'Re-read the lesson and try again — you need '+Math.ceil(PASS_MARK*total)+' of '+total+'.'}</p>
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px">
       <button class="btn primary" id="libReReadBtn">◂ back to lesson</button>
-      <button class="btn ghost" id="libToListBtn">all lessons</button>
+      <button class="btn ghost" id="libToListBtn">${LIB.returnTo==='map'?'back to map':'all lessons'}</button>
     </div>`;
   res.classList.remove('hidden');
   $('#libReReadBtn').addEventListener('click', ()=>openLesson(l));
-  $('#libToListBtn').addEventListener('click', showLessonList);
+  $('#libToListBtn').addEventListener('click', leaveLibraryContext);
 }
 
 $('#libBtn').addEventListener('click', openLibrary);
 $('#libQuizBtn').addEventListener('click', startLessonQuiz);
-$('#libBack').addEventListener('click', showLessonList);
+$('#libBack').addEventListener('click', leaveLibraryContext);
 $('#libNext').addEventListener('click', nextLibQ);
 $('#libQuit').addEventListener('click', ()=>{ $('#library').classList.add('hidden'); buildRoster(); $('#select').classList.remove('hidden'); });
+
+/* =====================================================================
+   7) MIND MAP — Obsidian-style force-directed knowledge graph on a
+   <canvas>, pure vanilla JS. Nodes = concepts (each has a quiz); edges =
+   hand-wired CONCEPT_LINKS. Node color = subject; node style = mastery
+   (from META.concepts, persisted). Tap a node → its lesson + quiz.
+   ===================================================================== */
+const MAP = { built:false, nodes:[], edges:[], scale:1, ox:0, oy:0, alpha:1,
+              canvas:null, ctx:null, raf:null, dpr:1, cssW:0, cssH:0,
+              drag:null, pan:null, down:null, subjColor:{} };
+
+function subjColor(subject){
+  if(!MAP.subjColor[subject]) MAP.subjColor[subject] = colorVal((ELEMENTS[subject]||ELEMENTS["A&P"]).css);
+  return MAP.subjColor[subject];
+}
+function buildMap(){
+  if(MAP.built) return; MAP.built = true;
+  const subjects = [...new Set(CONCEPTS.map(c=>c.subject))];
+  const si = {}; subjects.forEach((s,i)=>si[s]=i);
+  const count = {};
+  CONCEPTS.forEach(c=>{
+    const k = (count[c.subject] = (count[c.subject]||0)+1);
+    const base = (si[c.subject]/subjects.length)*Math.PI*2;   // subject sector
+    const ang = base + k*0.55;                                 // spiral within sector
+    const rad = 70 + k*24;
+    c.x = Math.cos(ang)*rad; c.y = Math.sin(ang)*rad; c.vx = 0; c.vy = 0;
+    MAP.nodes.push(c);
+  });
+  const seen = new Set();
+  CONCEPTS.forEach(a=>a.related.forEach(bid=>{
+    const key = [a.id,bid].sort().join('|');
+    if(seen.has(key) || !CONCEPT_BY_ID[bid]) return; seen.add(key);
+    MAP.edges.push([a, CONCEPT_BY_ID[bid]]);
+  }));
+}
+function reheatMap(){ MAP.alpha = 1; if(!MAP.raf) MAP.raf = requestAnimationFrame(mapFrame); }
+function resizeMap(){
+  const c = MAP.canvas, r = c.getBoundingClientRect();
+  MAP.cssW = r.width || window.innerWidth; MAP.cssH = r.height || window.innerHeight;
+  MAP.dpr = window.devicePixelRatio || 1;
+  c.width = MAP.cssW*MAP.dpr; c.height = MAP.cssH*MAP.dpr;
+}
+function openMap(){
+  SFX.init && SFX.init();
+  buildMap();
+  $('#select').classList.add('hidden');
+  $('#mindmap').classList.remove('hidden');
+  MAP.canvas = MAP.canvas || $('#mapCanvas');
+  MAP.ctx = MAP.ctx || MAP.canvas.getContext('2d');
+  resizeMap();
+  if(!MAP.ox && !MAP.oy){ MAP.ox = MAP.cssW/2; MAP.oy = MAP.cssH/2; } // center once
+  reheatMap();
+}
+function stopMap(){ if(MAP.raf){ cancelAnimationFrame(MAP.raf); MAP.raf = null; } }
+function resetMapLayout(){
+  MAP.built = false; MAP.nodes = []; MAP.edges = []; buildMap();
+  MAP.scale = 1; MAP.ox = MAP.cssW/2; MAP.oy = MAP.cssH/2; reheatMap();
+}
+
+/* --- physics: repel all pairs, springs on edges, gentle center gravity --- */
+function stepMap(){
+  const n = MAP.nodes, a = MAP.alpha;
+  for(let i=0;i<n.length;i++) for(let j=i+1;j<n.length;j++){
+    let dx=n[i].x-n[j].x, dy=n[i].y-n[j].y, d2=dx*dx+dy*dy;
+    if(d2<1){ d2=1; dx=(i-j)||1; } const d=Math.sqrt(d2); if(d>320) continue;
+    const f = 3200/d2, fx=dx/d*f, fy=dy/d*f;
+    n[i].vx+=fx*a; n[i].vy+=fy*a; n[j].vx-=fx*a; n[j].vy-=fy*a;
+  }
+  MAP.edges.forEach(([p,q])=>{
+    let dx=q.x-p.x, dy=q.y-p.y, d=Math.hypot(dx,dy)||1, f=(d-96)*0.02;
+    const fx=dx/d*f, fy=dy/d*f; p.vx+=fx*a; p.vy+=fy*a; q.vx-=fx*a; q.vy-=fy*a;
+  });
+  n.forEach(p=>{
+    if(p===MAP.drag){ p.vx=0; p.vy=0; return; }
+    p.vx += -p.x*0.004*a; p.vy += -p.y*0.004*a;
+    p.vx*=0.85; p.vy*=0.85; p.x+=p.vx; p.y+=p.vy;
+  });
+  MAP.alpha *= 0.99;
+}
+const w2s = p => ({ x:p.x*MAP.scale+MAP.ox, y:p.y*MAP.scale+MAP.oy });
+const s2w = (sx,sy) => ({ x:(sx-MAP.ox)/MAP.scale, y:(sy-MAP.oy)/MAP.scale });
+
+function renderMap(){
+  const ctx = MAP.ctx; if(!ctx) return;
+  ctx.setTransform(MAP.dpr,0,0,MAP.dpr,0,0);
+  ctx.clearRect(0,0,MAP.cssW,MAP.cssH);
+  const t = performance.now()/1000, pulse = 0.5+0.5*Math.sin(t*3.5);
+  // edges
+  ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(120,150,190,0.22)';
+  MAP.edges.forEach(([p,q])=>{ const a=w2s(p), b=w2s(q); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); });
+  // nodes
+  const r0 = Math.max(5, Math.min(30, 13*MAP.scale));
+  MAP.nodes.forEach(nd=>{
+    const s = w2s(nd), col = subjColor(nd.subject), st = conceptState(nd.id);
+    let r = r0;
+    ctx.save(); ctx.beginPath();
+    if(st==='weak'){
+      r = r0 + 2*pulse; ctx.shadowColor = colorVal('var(--hplow)'); ctx.shadowBlur = 8+10*pulse;
+      ctx.fillStyle = `rgba(255,77,77,${0.20+0.30*pulse})`; ctx.strokeStyle = colorVal('var(--hplow)'); ctx.lineWidth = 2;
+      ctx.arc(s.x,s.y,r,0,7); ctx.fill(); ctx.stroke();
+    } else if(st==='mastered'){
+      ctx.shadowColor = col; ctx.shadowBlur = 14; ctx.fillStyle = col; ctx.globalAlpha = 0.9;
+      ctx.arc(s.x,s.y,r,0,7); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0; ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
+    } else if(st==='read'){
+      ctx.fillStyle = col; ctx.globalAlpha = 0.14; ctx.arc(s.x,s.y,r,0,7); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
+    } else { // untouched — dim hollow
+      ctx.lineWidth = 1.5; ctx.strokeStyle = col; ctx.globalAlpha = 0.4; ctx.arc(s.x,s.y,r,0,7); ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+    if(MAP.scale > 0.5){
+      ctx.font = '11px ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(233,239,248,0.82)';
+      ctx.fillText(nd.title.length>22?nd.title.slice(0,21)+'…':nd.title, s.x, s.y+r+4);
+    }
+  });
+}
+function mapFrame(){
+  if($('#mindmap').classList.contains('hidden')){ MAP.raf = null; return; }
+  if(MAP.alpha > 0.02) stepMap();
+  renderMap();
+  MAP.raf = requestAnimationFrame(mapFrame);
+}
+
+/* --- open a concept: reuse the Library reader + quiz, then return to map --- */
+function openConcept(node){
+  LIB.returnTo = 'map';
+  stopMap();
+  $('#mindmap').classList.add('hidden');
+  $('#library').classList.remove('hidden');
+  const lesson = node.lessonId
+    ? LESSONS.find(l=>l.id===node.lessonId)
+    : { id:node.id, title:node.title, subject:node.subject, body:CHAPTER_PLACEHOLDER, quiz:node.quiz };
+  openLesson(lesson);
+}
+
+/* --- interaction: drag nodes, pan, wheel-zoom, tap-to-open --- */
+function mapHit(sx,sy){
+  const w = s2w(sx,sy); let best=null, bd=18*18/(MAP.scale*MAP.scale===0?1:1);
+  const rW = 16; // world-space pick radius
+  for(const nd of MAP.nodes){ const dx=nd.x-w.x, dy=nd.y-w.y, d2=dx*dx+dy*dy; if(d2<rW*rW && (!best || d2<bd)){ best=nd; bd=d2; } }
+  return best;
+}
+function zoomAt(sx,sy,factor){
+  const wx=(sx-MAP.ox)/MAP.scale, wy=(sy-MAP.oy)/MAP.scale;
+  MAP.scale = Math.max(0.3, Math.min(3, MAP.scale*factor));
+  MAP.ox = sx - wx*MAP.scale; MAP.oy = sy - wy*MAP.scale;
+  reheatMap();
+}
+function attachMapEvents(){
+  const c = $('#mapCanvas');
+  const pos = e => { const r=c.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; };
+  c.addEventListener('pointerdown', e=>{
+    const p = pos(e); MAP.down = { x:p.x, y:p.y, t:performance.now(), moved:0 };
+    const hit = mapHit(p.x, p.y);
+    if(hit){ MAP.drag = hit; hit.vx=0; hit.vy=0; } else { MAP.pan = { x:p.x, y:p.y }; }
+    c.setPointerCapture(e.pointerId); reheatMap();
+  });
+  c.addEventListener('pointermove', e=>{
+    if(!MAP.drag && !MAP.pan) return;
+    const p = pos(e);
+    if(MAP.down){ MAP.down.moved = Math.max(MAP.down.moved, Math.hypot(p.x-MAP.down.x, p.y-MAP.down.y)); }
+    if(MAP.drag){ const w = s2w(p.x,p.y); MAP.drag.x=w.x; MAP.drag.y=w.y; reheatMap(); }
+    else if(MAP.pan){ MAP.ox += p.x-MAP.pan.x; MAP.oy += p.y-MAP.pan.y; MAP.pan={x:p.x,y:p.y}; }
+  });
+  const end = e=>{
+    const wasDrag = MAP.drag;
+    if(wasDrag && MAP.down && MAP.down.moved < 5 && performance.now()-MAP.down.t < 400){ openConcept(wasDrag); }
+    MAP.drag = null; MAP.pan = null; MAP.down = null;
+  };
+  c.addEventListener('pointerup', end);
+  c.addEventListener('pointercancel', end);
+  c.addEventListener('wheel', e=>{ e.preventDefault(); const p=pos(e); zoomAt(p.x, p.y, e.deltaY<0?1.12:1/1.12); }, {passive:false});
+}
+attachMapEvents();
+window.addEventListener('resize', ()=>{ if(!$('#mindmap').classList.contains('hidden')){ resizeMap(); } });
+
+$('#mapBtn').addEventListener('click', openMap);
+$('#mapReset').addEventListener('click', resetMapLayout);
+$('#mapZoomIn').addEventListener('click', ()=>zoomAt(MAP.cssW/2, MAP.cssH/2, 1.2));
+$('#mapZoomOut').addEventListener('click', ()=>zoomAt(MAP.cssW/2, MAP.cssH/2, 1/1.2));
+$('#mapQuit').addEventListener('click', ()=>{ stopMap(); $('#mindmap').classList.add('hidden'); buildRoster(); $('#select').classList.remove('hidden'); });
 
 /* keyboard: A–D to answer, Enter/Space to continue (battle + cram + library quiz) */
 document.addEventListener('keydown', e=>{
