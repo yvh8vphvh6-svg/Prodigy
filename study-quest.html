@@ -127,6 +127,38 @@
   .missed .mq .ans{ color:var(--reagent); }
   .missed .mq .why{ color:var(--muted); }
 
+  /* ---------- library mode ---------- */
+  #library{ overflow:auto; padding:16px max(16px,env(safe-area-inset-left)) calc(16px + env(safe-area-inset-bottom)); }
+  .libwrap{ width:min(920px,100%); margin:0 auto; display:flex; flex-direction:column; gap:14px; }
+  .libtop{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .libtop .btn{ margin-left:auto; padding:8px 14px; font-size:11px; }
+  .lessonlist{ display:flex; flex-direction:column; gap:10px; }
+  .lesson{ text-align:left; background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border:1px solid var(--line); border-radius:12px; padding:14px 16px; cursor:pointer;
+    display:flex; align-items:center; gap:12px; transition:transform .1s, border-color .12s; }
+  .lesson:hover{ transform:translateX(2px); border-color:var(--reagent); }
+  .lesson:focus-visible{ outline:3px solid var(--reagent); outline-offset:2px; }
+  .lesson .subjtag{ font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    padding:3px 8px; border-radius:6px; border:1px solid var(--el); color:var(--el); flex:none; }
+  .lesson h3{ margin:0; font-size:16px; flex:1; }
+  .lesson .done{ font-family:var(--mono); font-size:11px; color:var(--hp); letter-spacing:.08em; flex:none; }
+  .lesson .lede2{ margin:0; font-size:12px; color:var(--dim); }
+
+  .reader{ display:grid; grid-template-columns:1fr 320px; gap:16px; min-height:0; }
+  @media (max-width:720px){ .reader{ grid-template-columns:1fr; } }
+  .readpane{ background:var(--panel); border:1px solid var(--line2); border-radius:14px; padding:20px;
+    max-height:62vh; overflow:auto; }
+  .readpane h2{ margin:0 0 4px; font-size:24px; letter-spacing:-.01em; }
+  .readpane .kicker{ font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--el); margin-bottom:14px; }
+  .readpane p{ margin:0 0 14px; font-size:15px; line-height:1.7; color:var(--text); }
+  .notepane{ display:flex; flex-direction:column; gap:8px; }
+  .notepane label{ font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+  .notepane textarea{ flex:1; min-height:220px; resize:vertical; background:var(--bg2); color:var(--text);
+    border:1px solid var(--line2); border-radius:12px; padding:12px; font-family:var(--ui); font-size:14px; line-height:1.6; }
+  .notepane textarea:focus-visible{ outline:3px solid var(--reagent); outline-offset:1px; }
+  .notepane .saved{ font-family:var(--mono); font-size:10px; letter-spacing:.08em; color:var(--hp); opacity:0; transition:opacity .2s; }
+  .notepane .saved.show{ opacity:1; }
+
   /* ---------- battle ---------- */
   #battle{ padding:0; }
   .arena{ position:relative; flex:1; min-height:0; display:flex; flex-direction:column;
@@ -245,9 +277,12 @@
     <p class="lede">Answer to cast. Every right answer hits the enemy; every miss hits you.
       Beat it before your vitals flatline. Pick who you're taking into the ward.</p>
     <div class="subtabs" id="subtabs" aria-label="choose a subject"></div>
-    <button class="btn" id="cramBtn">📖 cram mode — rapid-fire drill, no battle</button>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center">
+      <button class="btn" id="cramBtn">📖 cram mode — rapid-fire drill</button>
+      <button class="btn" id="libBtn">📚 library — read &amp; take notes</button>
+    </div>
     <div class="roster" id="roster"></div>
-    <div class="eyebrow" style="opacity:.6">↑ tap a student to battle · or cram without combat</div>
+    <div class="eyebrow" style="opacity:.6">↑ tap a student to battle · or study without combat</div>
   </section>
 
   <!-- ===== BATTLE ===== -->
@@ -311,6 +346,46 @@
         <div class="nextrow" id="cramNextRow"><button class="btn primary" id="cramNext">next ▸</button></div>
       </div>
       <div class="cramsummary hidden" id="cramSummary"></div>
+    </div>
+  </section>
+
+  <!-- ===== LIBRARY MODE ===== -->
+  <section id="library" class="screen hidden">
+    <div class="libwrap">
+      <div class="libtop">
+        <span class="chip" id="libSubj">ALL</span>
+        <span class="chip" id="libProgress">0 / 0 complete</span>
+        <button class="btn ghost" id="libQuit">back to select</button>
+      </div>
+      <!-- list of lessons -->
+      <div class="lessonlist" id="lessonList"></div>
+      <!-- reading view (hidden until a lesson is opened) -->
+      <div id="libReader" class="hidden">
+        <div class="reader">
+          <div class="readpane" id="readPane"></div>
+          <div class="notepane">
+            <label for="noteBox">your notes</label>
+            <textarea id="noteBox" placeholder="Jot down anything worth remembering…"></textarea>
+            <span class="saved" id="noteSaved">✓ saved</span>
+          </div>
+        </div>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px">
+          <button class="btn primary" id="libQuizBtn">take the quiz ▸</button>
+          <button class="btn ghost" id="libBack">◂ all lessons</button>
+        </div>
+      </div>
+      <!-- lesson quiz (reuses the cram-style panel) -->
+      <div id="libQuiz" class="hidden">
+        <div class="qpanel" id="libQPanel" style="border:1px solid var(--line2); border-radius:14px">
+          <div class="qtop"><span class="element" id="libElement" style="--el:var(--reagent)">—</span>
+            <span class="chip" id="libQCount" style="margin-left:auto">1 / 1</span></div>
+          <div class="q" id="libQText">—</div>
+          <div class="choices" id="libChoices"></div>
+          <div class="rationale" id="libRationale"></div>
+          <div class="nextrow" id="libNextRow"><button class="btn primary" id="libNext">next ▸</button></div>
+        </div>
+        <div class="cramsummary hidden" id="libResult"></div>
+      </div>
     </div>
   </section>
 
@@ -396,6 +471,78 @@ const QUESTION_BANK = [
   {subject:"Math", chapter:"Roman Numerals", q:"The Roman numeral IX represents:", choices:["6","9","11","19"], answer:1, why:"IX = 10 − 1 = 9."},
 ];
 
+/* =====================================================================
+   LESSONS — the Library reading material. THIS IS THE ONE PLACE to paste
+   your own chapters. Each lesson is:
+     {
+       id:      "unique-string",     // stable key; used to save notes + completion
+       title:   "Chapter title",
+       subject: "A&P" | "Chemistry" | "Biology" | "Math",  // drives the subject filter + tag color
+       body:    "Reading text.\n\nBlank lines start a new paragraph.\nSingle newlines become line breaks.",
+       quiz:    [                     // the end-of-lesson quiz (same shape as QUESTION_BANK entries)
+         { q:"Question?", choices:["A","B","C","D"], answer:1, why:"Why B is right." },
+         // …add as many as you like. Pass mark is 70% correct.
+       ],
+     }
+   Seeded below with three real A&P lessons so you can see it working —
+   replace or extend the array with your own material.
+   ===================================================================== */
+const LESSONS = [
+  {
+    id:"ap-cell",
+    title:"The Cell & Its Organelles",
+    subject:"A&P",
+    body:`The cell is the smallest unit of life, and every tissue in the body is built from cells specialized for a job. Despite that variety, most human cells share the same core parts.
+
+The plasma membrane is a phospholipid bilayer that surrounds the cell. It is selectively permeable: it lets some substances pass freely while controlling others through channels and pumps. This is what keeps the inside of the cell chemically different from the fluid around it.
+
+The nucleus is the control center. It holds the cell's DNA and directs protein synthesis by sending out messenger RNA. Surrounding the nucleus is the cytoplasm, a gel-like fluid where the organelles sit.
+
+Mitochondria are the "powerhouses." Through oxidative phosphorylation they produce most of the cell's ATP — the molecule that stores usable energy. Cells that work hard, like heart muscle, are packed with mitochondria.
+
+Ribosomes read mRNA and assemble amino acids into proteins (translation). Some float free in the cytoplasm; others stud the rough endoplasmic reticulum. The Golgi apparatus then packages and ships those proteins to their destinations.`,
+    quiz:[
+      { q:"Which organelle produces most of the cell's ATP?", choices:["Nucleus","Ribosome","Mitochondria","Golgi apparatus"], answer:2, why:"Mitochondria run oxidative phosphorylation, the cell's main ATP source." },
+      { q:"The plasma membrane is best described as:", choices:["Fully impermeable","Selectively permeable","A rigid wall","A single protein sheet"], answer:1, why:"It lets some substances through while controlling others — selectively permeable." },
+      { q:"Ribosomes are responsible for:", choices:["Lipid storage","Protein synthesis","DNA replication","Energy storage"], answer:1, why:"Ribosomes translate mRNA into proteins." },
+      { q:"What directs protein synthesis from within the cell?", choices:["Mitochondria","The nucleus","The Golgi apparatus","The cytoplasm"], answer:1, why:"The nucleus holds DNA and sends out mRNA to direct protein synthesis." },
+    ],
+  },
+  {
+    id:"ap-cardio",
+    title:"The Heart & Circulation",
+    subject:"A&P",
+    body:`The heart is a four-chambered pump: two atria on top receive blood, and two ventricles below eject it. A wall called the septum separates the right side from the left.
+
+Blood follows a fixed path. Oxygen-poor blood returns from the body to the right atrium, drops into the right ventricle, and is pumped to the lungs to pick up oxygen (the pulmonary circuit). Oxygen-rich blood comes back to the left atrium, into the left ventricle, and is pumped out through the aorta to the whole body (the systemic circuit).
+
+The heartbeat is electrical. The sinoatrial (SA) node — the heart's natural pacemaker — fires an impulse that spreads across the atria, pauses at the AV node, then races down the bundle of His and Purkinje fibers to trigger the ventricles.
+
+One cardiac cycle has two phases. During systole the ventricles contract and eject blood; during diastole they relax and refill. A normal resting heart rate for an adult is 60–100 beats per minute — below 60 is bradycardia, above 100 is tachycardia.`,
+    quiz:[
+      { q:"The heart's natural pacemaker is the:", choices:["AV node","SA node","Bundle of His","Purkinje fibers"], answer:1, why:"The SA node sets the rhythm by firing the initiating impulse." },
+      { q:"After the right ventricle, blood travels to the:", choices:["Aorta","Body tissues","Lungs","Left atrium"], answer:2, why:"The right ventricle pumps blood to the lungs for oxygen (pulmonary circuit)." },
+      { q:"During systole, the ventricles are:", choices:["Relaxing and filling","Contracting and ejecting blood","Sealed off","Refilling the atria"], answer:1, why:"Systole = contraction/ejection; diastole = relaxation/filling." },
+      { q:"A normal adult resting heart rate is:", choices:["20–40 bpm","60–100 bpm","100–140 bpm","140–180 bpm"], answer:1, why:"60–100 bpm; below is bradycardia, above is tachycardia." },
+    ],
+  },
+  {
+    id:"ap-resp",
+    title:"The Respiratory System",
+    subject:"A&P",
+    body:`The respiratory system moves air in and out and exchanges gases with the blood. Air enters through the nose or mouth, travels down the trachea, and splits into the two bronchi, one for each lung. The bronchi branch into ever-smaller tubes called bronchioles.
+
+At the end of the smallest bronchioles are the alveoli — tiny, thin-walled air sacs wrapped in capillaries. This is where gas exchange happens: oxygen diffuses from the alveoli into the blood, and carbon dioxide diffuses out of the blood to be exhaled. The alveolar walls are only one cell thick, which makes that exchange fast.
+
+Breathing is driven by the diaphragm, a dome-shaped muscle beneath the lungs. When it contracts and flattens, the chest cavity enlarges, pressure drops, and air flows in — inhalation. When it relaxes, the cavity shrinks and air is pushed out — exhalation.`,
+    quiz:[
+      { q:"Gas exchange in the lungs occurs in the:", choices:["Bronchi","Trachea","Alveoli","Pleura"], answer:2, why:"Alveoli are the thin-walled sacs where O₂ and CO₂ are exchanged." },
+      { q:"When the diaphragm contracts and flattens, it causes:", choices:["Exhalation","Inhalation","Coughing","Breath-holding"], answer:1, why:"A contracting diaphragm enlarges the chest, so air flows in." },
+      { q:"Which makes alveolar gas exchange fast?", choices:["Thick muscular walls","Walls only one cell thick","A lack of blood supply","Cartilage rings"], answer:1, why:"The one-cell-thick walls let gases diffuse quickly into nearby capillaries." },
+    ],
+  },
+];
+
 /* subject → spell (color encodes the element) */
 const ELEMENTS = {
   "A&P":       {spell:"Vitals Surge",  css:"var(--vitals)"},
@@ -451,10 +598,12 @@ const CHARACTERS = [
 /* ---- lifetime study progress + unlocks (localStorage; survives closing the tab) ---- */
 const SAVE_KEY = "clinicalQuestSave";
 function loadMeta(){
-  const fresh = { unlocked:[], lastChar:null, progress:{corrects:0, wins:0, bestStreak:0, bestTier:0, bestLevel:1} };
+  const fresh = { unlocked:[], lastChar:null, notes:{}, lessonsDone:[],
+                  progress:{corrects:0, wins:0, bestStreak:0, bestTier:0, bestLevel:1} };
   try{
     const m = JSON.parse(localStorage.getItem(SAVE_KEY)) || {};
     return { unlocked:m.unlocked||[], lastChar:m.lastChar||null,
+             notes:m.notes||{}, lessonsDone:m.lessonsDone||[],
              progress:Object.assign(fresh.progress, m.progress) };
   }catch(e){ return fresh; }
 }
@@ -963,20 +1112,154 @@ $('#cramBtn').addEventListener('click', startCram);
 $('#cramNext').addEventListener('click', ()=>{ S.qi++; loadCramQ(); });
 $('#cramEnd').addEventListener('click', endCram);
 
-/* keyboard: A–D to answer, Enter/Space to continue (battle + cram) */
+/* =====================================================================
+   6) LIBRARY MODE — read lessons, take notes, quiz to complete.
+   Notes + completion persist in META (localStorage). Quiz correct
+   answers count toward the same lifetime unlock progress.
+   ===================================================================== */
+const LIB = { lesson:null, qi:0, correct:0, answering:false, noteTimer:null };
+const PASS_MARK = 0.7; // 70% to mark a lesson complete
+
+function escapeHtml(s){ return s.replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function bodyToHtml(body){ // blank line → new paragraph, single newline → <br>
+  return body.split(/\n{2,}/).map(p=>`<p>${escapeHtml(p).replace(/\n/g,'<br>')}</p>`).join('');
+}
+
+function openLibrary(){
+  SFX.init(); SFX.resume();
+  $('#libSubj').textContent = subjectSel.toUpperCase();
+  $('#select').classList.add('hidden');
+  $('#library').classList.remove('hidden');
+  showLessonList();
+}
+function showLessonList(){
+  $('#libReader').classList.add('hidden');
+  $('#libQuiz').classList.add('hidden');
+  $('#lessonList').classList.remove('hidden');
+  const pool = subjectSel==="All" ? LESSONS : LESSONS.filter(l=>l.subject===subjectSel);
+  $('#libProgress').textContent = `${pool.filter(l=>META.lessonsDone.includes(l.id)).length} / ${pool.length} complete`;
+  const wrap = $('#lessonList'); wrap.innerHTML='';
+  if(!pool.length){ wrap.innerHTML = `<p style="color:var(--muted); font-size:14px">No lessons for this subject yet — switch the subject tab, or add lessons to the LESSONS array.</p>`; return; }
+  pool.forEach(l=>{
+    const done = META.lessonsDone.includes(l.id);
+    const el = ELEMENTS[l.subject] || ELEMENTS["A&P"];
+    const b = document.createElement('button'); b.className='lesson'; b.type='button';
+    b.style.setProperty('--el', el.css);
+    b.innerHTML = `<span class="subjtag">${l.subject}</span>
+      <div style="flex:1"><h3>${l.title}</h3><p class="lede2">${l.quiz.length} quiz question${l.quiz.length>1?'s':''}${done?'':' · not yet completed'}</p></div>
+      ${done?'<span class="done">✓ complete</span>':''}`;
+    b.addEventListener('click', ()=>openLesson(l));
+    wrap.appendChild(b);
+  });
+}
+function openLesson(l){
+  LIB.lesson = l;
+  const el = ELEMENTS[l.subject] || ELEMENTS["A&P"];
+  const pane = $('#readPane'); pane.style.setProperty('--el', el.css);
+  pane.innerHTML = `<div class="kicker">${l.subject} · lesson</div><h2>${l.title}</h2>${bodyToHtml(l.body)}`;
+  pane.scrollTop = 0;
+  const box = $('#noteBox'); box.value = META.notes[l.id] || '';
+  $('#lessonList').classList.add('hidden');
+  $('#libQuiz').classList.add('hidden');
+  $('#libReader').classList.remove('hidden');
+}
+$('#noteBox').addEventListener('input', ()=>{
+  if(!LIB.lesson) return;
+  META.notes[LIB.lesson.id] = $('#noteBox').value; saveMeta();
+  const s=$('#noteSaved'); s.classList.add('show');
+  clearTimeout(LIB.noteTimer); LIB.noteTimer=setTimeout(()=>s.classList.remove('show'), 1200);
+});
+
+function startLessonQuiz(){
+  LIB.qi=0; LIB.correct=0; LIB.answering=false;
+  $('#libReader').classList.add('hidden');
+  $('#libResult').classList.add('hidden');
+  $('#libQPanel').classList.remove('hidden');
+  $('#libQuiz').classList.remove('hidden');
+  loadLibQ();
+}
+function loadLibQ(){
+  LIB.answering=false;
+  const l=LIB.lesson, q=l.quiz[LIB.qi];
+  const el = ELEMENTS[l.subject] || ELEMENTS["A&P"];
+  const badge=$('#libElement'); badge.textContent=`${l.subject} · quiz`; badge.style.setProperty('--el', el.css);
+  $('#libQCount').textContent = `${LIB.qi+1} / ${l.quiz.length}`;
+  $('#libQText').textContent = q.q;
+  const wrap=$('#libChoices'); wrap.innerHTML='';
+  const keys=['A','B','C','D'];
+  q.choices.forEach((c,i)=>{
+    const b=document.createElement('button'); b.className='choice'; b.type='button';
+    b.innerHTML=`<span class="k">${keys[i]}</span><span>${c}</span>`;
+    b.addEventListener('click', ()=>libAnswer(i));
+    wrap.appendChild(b);
+  });
+  $('#libRationale').classList.remove('show'); $('#libRationale').innerHTML='';
+  $('#libNextRow').classList.remove('show');
+}
+function libAnswer(i){
+  if(LIB.answering) return; LIB.answering=true;
+  const q=LIB.lesson.quiz[LIB.qi];
+  const correct = i===q.answer;
+  document.querySelectorAll('#libChoices .choice').forEach((el,idx)=>{
+    el.classList.add('lock');
+    if(idx===q.answer) el.classList.add('correct');
+    if(idx===i && !correct) el.classList.add('wrong');
+  });
+  if(correct){ LIB.correct++; SFX.hit(false); bumpProgress('corrects', 1); } // quiz correct → lifetime unlock progress
+  else SFX.hurt();
+  const r=$('#libRationale');
+  r.innerHTML=`<b>${correct?'✓ Correct — ':'✗ Missed — '}</b>${q.why}`;
+  r.classList.add('show');
+  $('#libNextRow').classList.add('show'); $('#libNext').focus();
+}
+function nextLibQ(){
+  if(LIB.qi < LIB.lesson.quiz.length-1){ LIB.qi++; loadLibQ(); return; }
+  finishLessonQuiz();
+}
+function finishLessonQuiz(){
+  const l=LIB.lesson, total=l.quiz.length, acc=Math.round(LIB.correct/total*100);
+  const passed = LIB.correct/total >= PASS_MARK;
+  if(passed && !META.lessonsDone.includes(l.id)){ META.lessonsDone.push(l.id); saveMeta(); }
+  if(passed) SFX.win();
+  $('#libQPanel').classList.add('hidden'); $('#libNextRow').classList.remove('show');
+  const res=$('#libResult');
+  res.innerHTML = `
+    <h2>${passed?'Lesson complete ✓':'Not quite — review & retry'}</h2>
+    <div class="nums">SCORE <b>${LIB.correct} / ${total}</b> · ${acc}% · pass mark ${Math.round(PASS_MARK*100)}%</div>
+    <p style="color:var(--muted); font-size:14px">${passed?'Marked complete and saved. Your correct answers counted toward unlocks.':'Re-read the lesson and try again — you need '+Math.ceil(PASS_MARK*total)+' of '+total+'.'}</p>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px">
+      <button class="btn primary" id="libReReadBtn">◂ back to lesson</button>
+      <button class="btn ghost" id="libToListBtn">all lessons</button>
+    </div>`;
+  res.classList.remove('hidden');
+  $('#libReReadBtn').addEventListener('click', ()=>openLesson(l));
+  $('#libToListBtn').addEventListener('click', showLessonList);
+}
+
+$('#libBtn').addEventListener('click', openLibrary);
+$('#libQuizBtn').addEventListener('click', startLessonQuiz);
+$('#libBack').addEventListener('click', showLessonList);
+$('#libNext').addEventListener('click', nextLibQ);
+$('#libQuit').addEventListener('click', ()=>{ $('#library').classList.add('hidden'); buildRoster(); $('#select').classList.remove('hidden'); });
+
+/* keyboard: A–D to answer, Enter/Space to continue (battle + cram + library quiz) */
 document.addEventListener('keydown', e=>{
   const inBattle = !$('#battle').classList.contains('hidden');
   const inCram = !inBattle && !$('#cram').classList.contains('hidden');
-  if(!inBattle && !inCram) return;
+  const inLibQuiz = !inBattle && !inCram && !$('#library').classList.contains('hidden')
+                    && !$('#libQuiz').classList.contains('hidden');
+  if(!inBattle && !inCram && !inLibQuiz) return;
+  if(document.activeElement && document.activeElement.tagName==='TEXTAREA') return; // don't hijack note-taking
+  const ctx = inBattle ? {choices:'#choices', nextRow:'#nextRow', next:'#nextBtn', busy:S.answering}
+            : inCram   ? {choices:'#cramChoices', nextRow:'#cramNextRow', next:'#cramNext', busy:CRAM.answering}
+            :            {choices:'#libChoices', nextRow:'#libNextRow', next:'#libNext', busy:LIB.answering};
   const map={a:0,b:1,c:2,d:3};
   const k=e.key?.toLowerCase();
-  const busy = inBattle ? S.answering : CRAM.answering;
-  if(map[k]!==undefined && !busy){
-    const b=document.querySelectorAll((inBattle?'#choices':'#cramChoices')+' .choice')[map[k]]; if(b) b.click();
+  if(map[k]!==undefined && !ctx.busy){
+    const b=document.querySelectorAll(ctx.choices+' .choice')[map[k]]; if(b) b.click();
   }
-  const nextRow = inBattle ? '#nextRow' : '#cramNextRow';
-  if((e.key==='Enter'||e.key===' ') && $(nextRow).classList.contains('show')){
-    e.preventDefault(); $(inBattle?'#nextBtn':'#cramNext').click();
+  if((e.key==='Enter'||e.key===' ') && $(ctx.nextRow).classList.contains('show')){
+    e.preventDefault(); $(ctx.next).click();
   }
 });
 
