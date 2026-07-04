@@ -388,7 +388,8 @@ function currentQ(){ if(S.qi>=S.queue.length) refillQueue(); return S.queue[S.qi
 function makeEnemy(i){
   const name = ENEMIES[Math.min(i, ENEMIES.length-1)];
   const color = ENEMY_COLORS[i % ENEMY_COLORS.length];
-  const maxHp = 30 + i*22;
+  const lvl = S.player ? S.player.level : 1;
+  const maxHp = Math.round(30 + i*10 + (lvl-1)*12); // scales with tier AND player level → fights stay ~4-6 hits instead of growing into grinds
   return { name, color, maxHp, hp:maxHp, atk:6 + i*2, xp:20 + i*12, coins:15 + i*6, tier:i+1 };
 }
 
@@ -423,6 +424,7 @@ function startRun(c){
 }
 
 function startBattle(){
+  S.player.streak = Math.floor(S.player.streak/2); // don't carry a full streak into a fresh fight
   S.enemy = makeEnemy(S.enemyIndex);
   const en = $('#enemy');
   en.innerHTML = enemySVG(S.enemy.color);
@@ -492,11 +494,8 @@ function resolve(choiceIndex){
   });
 
   if(correct){
-    const secs = (performance.now()-S.qStart)/1000;
-    const fast = secs < 6;
     const crit = Math.random() < 0.15;
-    let dmg = S.player.atk * (1 + Math.min(S.player.streak*0.1, 1)); // streak scaling
-    if(fast) dmg *= 1.25;
+    let dmg = S.player.atk * (1 + Math.min(S.player.streak*0.1, 0.5)); // streak scaling, capped at +50%
     if(crit) dmg *= 2;
     dmg = Math.round(dmg * (0.9 + Math.random()*0.2));
     S.enemy.hp = Math.max(0, S.enemy.hp - dmg);
@@ -512,7 +511,7 @@ function resolve(choiceIndex){
     });
     showRationale(q, true);
   } else {
-    S.player.streak = 0;
+    S.player.streak = Math.floor(S.player.streak/2); // decay, don't zero — one miss shouldn't collapse the multiplier
     const dmg = Math.round(S.enemy.atk * (0.9 + Math.random()*0.2));
     S.player.hp = Math.max(0, S.player.hp - dmg);
     SFX.hurt(); hurtPlayer();
