@@ -81,6 +81,36 @@
   .btn.primary{ background:linear-gradient(180deg,#2a9d7a,#1f7a5e); border-color:#2fe0a8; color:#eafff7; }
   .btn.ghost{ background:transparent; }
 
+  /* ---------- subject tabs ---------- */
+  .subtabs{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+  .subtab{ font-family:var(--mono); font-size:12px; letter-spacing:.1em; text-transform:uppercase;
+    padding:8px 14px; border-radius:999px; border:1px solid var(--line2); background:transparent;
+    color:var(--muted); cursor:pointer; transition:color .12s, border-color .12s, background .12s; }
+  .subtab:hover{ border-color:var(--reagent); color:var(--text); }
+  .subtab:focus-visible{ outline:3px solid var(--reagent); outline-offset:2px; }
+  .subtab.on{ background:var(--panel2); border-color:var(--reagent); color:var(--reagent); }
+
+  /* ---------- roster passives + locked cards ---------- */
+  .hero .passive{ margin-top:10px; font-family:var(--mono); font-size:11px; letter-spacing:.06em; color:var(--gold); }
+  .hero .passive b{ color:var(--muted); font-weight:400; }
+  .hero.locked{ cursor:not-allowed; }
+  .hero.locked:hover{ transform:none; border-color:var(--line); box-shadow:none; }
+  .hero.locked .av,.hero.locked h3,.hero.locked .role,.hero.locked p,
+  .hero.locked .stats,.hero.locked .passive{ filter:grayscale(1); opacity:.45; }
+  .hero .lockrow{ margin-top:10px; font-family:var(--mono); font-size:11px; line-height:1.5; color:var(--muted); }
+  .hero .lockrow .goal{ color:var(--text); }
+  .hero .lockrow .prog{ color:var(--reagent); }
+  .hero .lastused{ position:absolute; top:10px; right:10px; font-family:var(--mono); font-size:9px;
+    letter-spacing:.1em; color:var(--gold); border:1px solid #6a5a20; border-radius:5px; padding:2px 6px; }
+
+  /* ---------- unlock toast ---------- */
+  .toast{ position:fixed; top:18px; left:50%; transform:translate(-50%,-80px); z-index:80;
+    font-family:var(--mono); font-size:13px; letter-spacing:.08em; color:var(--gold);
+    background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid #6a5a20;
+    border-radius:10px; padding:12px 20px; box-shadow:0 0 30px rgba(255,210,95,.35); opacity:0; pointer-events:none; }
+  .toast.go{ animation:toastIn 3s cubic-bezier(.2,.8,.2,1); }
+  @keyframes toastIn{ 0%{ opacity:0; transform:translate(-50%,-80px) } 12%,80%{ opacity:1; transform:translate(-50%,0) } 100%{ opacity:0; transform:translate(-50%,-80px) } }
+
   /* ---------- battle ---------- */
   #battle{ padding:0; }
   .arena{ position:relative; flex:1; min-height:0; display:flex; flex-direction:column;
@@ -198,6 +228,7 @@
     <h1>CLINICAL QUEST<span class="sub">a nursing / teas study rpg</span></h1>
     <p class="lede">Answer to cast. Every right answer hits the enemy; every miss hits you.
       Beat it before your vitals flatline. Pick who you're taking into the ward.</p>
+    <div class="subtabs" id="subtabs" aria-label="choose a subject"></div>
     <div class="roster" id="roster"></div>
     <div class="eyebrow" style="opacity:.6">↑ tap a student to start · you can customize looks later</div>
   </section>
@@ -257,6 +288,7 @@
   </div>
 
   <div class="levelup" id="levelup"><span>LEVEL UP</span></div>
+  <div class="toast" id="toast">★ CHARACTER UNLOCKED</div>
   <div class="soundnote">🔊 sound on for spell &amp; hit effects</div>
 
 <script>
@@ -334,12 +366,79 @@ const ELEMENTS = {
   "Math":      {spell:"Calc Strike",   css:"var(--calc)"},
 };
 
-/* selectable students (Gacha-style pick; customization is a roadmap HOOK) */
+/* selectable students (Gacha-style pick; customization is a roadmap HOOK)
+   Each character has a passive `buff`. Types and where they apply:
+     dmg     {pct}          +pct% spell damage            → resolve()
+     subjDmg {subject,pct}  +pct% damage on one subject   → resolve()
+     crit    {add}          +add crit chance (base 15%)   → resolve()
+     guard   {pct}          −pct% damage taken on a miss  → resolve()
+     coins   {mult}         coin gains ×mult              → gainCoins()
+     xp      {mult}         XP gains ×mult                → gainXp()
+   Locked characters carry an `unlock` STUDY goal. Available lifetime stats
+   (tracked in META.progress, saved to localStorage):
+     corrects · wins · bestStreak · bestTier · bestLevel */
 const CHARACTERS = [
-  {id:"icu",   name:"ICU Recruit",     role:"balanced",     accent:"#2fe0a8", maxHp:46, atk:10, sigil:"⬡", blurb:"Steady under pressure. No glaring weakness."},
-  {id:"night", name:"Night-Shift Vet", role:"tank",         accent:"#b57cff", maxHp:56, atk:8,  sigil:"◈", blurb:"High HP. Survives long fights and bad streaks."},
-  {id:"trauma",name:"Trauma Junkie",   role:"glass cannon", accent:"#ff5470", maxHp:38, atk:13, sigil:"✦", blurb:"Hits hard, folds fast. High risk, high damage."},
+  {id:"icu",   name:"ICU Recruit",     role:"balanced",     accent:"#2fe0a8", maxHp:46, atk:10, sigil:"⬡", blurb:"Steady under pressure. No glaring weakness.",
+   buff:{type:"xp", mult:1.10, label:"+10% XP"}},
+  {id:"night", name:"Night-Shift Vet", role:"tank",         accent:"#b57cff", maxHp:56, atk:8,  sigil:"◈", blurb:"High HP. Survives long fights and bad streaks.",
+   buff:{type:"guard", pct:0.20, label:"−20% damage taken"}},
+  {id:"trauma",name:"Trauma Junkie",   role:"glass cannon", accent:"#ff5470", maxHp:38, atk:13, sigil:"✦", blurb:"Hits hard, folds fast. High risk, high damage.",
+   buff:{type:"crit", add:0.10, label:"+10% crit chance"}},
+  {id:"pharm", name:"Pharm Phenom",    role:"specialist",   accent:"#4b8bff", maxHp:44, atk:10, sigil:"⬢", blurb:"Lives in the med room. Chemistry is home turf.",
+   buff:{type:"subjDmg", subject:"Chemistry", pct:0.30, label:"+30% damage on Chemistry"},
+   unlock:{stat:"corrects", need:40, label:"Answer 40 questions correctly"}},
+  {id:"charge",name:"Charge Nurse",    role:"economist",    accent:"#ffd25f", maxHp:50, atk:9,  sigil:"◆", blurb:"Runs the floor. Somehow always finds the resources.",
+   buff:{type:"coins", mult:2, label:"2× coins"},
+   unlock:{stat:"wins", need:10, label:"Win 10 battles"}},
+  {id:"flight",name:"Flight Nurse",    role:"striker",      accent:"#ff8a3d", maxHp:42, atk:11, sigil:"▲", blurb:"Fast, focused, and allergic to hesitation.",
+   buff:{type:"dmg", pct:0.25, label:"+25% spell damage"},
+   unlock:{stat:"bestStreak", need:12, label:"Hit a 12-answer streak"}},
+  /* ================== YOUR CHAMPION — EDIT ME ==================
+     Placeholder slot for YOUR favorite character. Customize by editing
+     ONLY the fields on the entry below:
+       name   → display name
+       sigil  → the avatar: any character or emoji (shipped ones are
+                original glyphs — keep yours non-copyrighted too)
+       accent → card + avatar color (any CSS color)
+       blurb  → flavor text on the card
+       buff   → the big damage bonus; raise/lower `pct`, or switch to
+                any buff type from the table above
+       unlock → the study goal gating it (stat + need + label)
+     ============================================================= */
+  {id:"champ", name:"The Prodigy",     role:"your champion", accent:"#ff3d5e", maxHp:48, atk:12, sigil:"★", blurb:"Reserved for your favorite. Rename me — see the comment above.",
+   buff:{type:"dmg", pct:0.40, label:"+40% spell damage"},
+   unlock:{stat:"bestTier", need:6, label:"Clear tier 6"}},
 ];
+
+/* ---- lifetime study progress + unlocks (localStorage; survives closing the tab) ---- */
+const SAVE_KEY = "clinicalQuestSave";
+function loadMeta(){
+  const fresh = { unlocked:[], lastChar:null, progress:{corrects:0, wins:0, bestStreak:0, bestTier:0, bestLevel:1} };
+  try{
+    const m = JSON.parse(localStorage.getItem(SAVE_KEY)) || {};
+    return { unlocked:m.unlocked||[], lastChar:m.lastChar||null,
+             progress:Object.assign(fresh.progress, m.progress) };
+  }catch(e){ return fresh; }
+}
+const META = loadMeta();
+function saveMeta(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(META)); }catch(e){} }
+function isUnlocked(c){ return !c.unlock || META.unlocked.includes(c.id); }
+function bumpProgress(stat, value, absolute){
+  const p = META.progress;
+  p[stat] = absolute ? Math.max(p[stat], value) : p[stat] + value;
+  saveMeta(); checkUnlocks();
+}
+function checkUnlocks(){
+  CHARACTERS.forEach(c=>{
+    if(c.unlock && !META.unlocked.includes(c.id) && META.progress[c.unlock.stat] >= c.unlock.need){
+      META.unlocked.push(c.id); saveMeta();
+      SFX.level();
+      showToast(`★ CHARACTER UNLOCKED — ${c.name}`);
+      buildRoster();
+    }
+  });
+}
+function showToast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.remove('go'); void t.offsetWidth; t.classList.add('go'); }
 
 const ENEMIES = ["Pop-Quiz Gremlin","The Cram Wraith","Clinical-Skills Ogre","Pharm Hydra","Anatomy Behemoth","Final Boss: The Proctor"];
 const ENEMY_COLORS = ["#ff6b3d","#c04bd6","#4b8bff","#e0b83a","#4be089","#ff3d5e"];
@@ -382,7 +481,10 @@ const S = { player:null, enemy:null, enemyIndex:0, queue:[], qi:0, answering:fal
 const TIME_PER_Q = 18;
 
 function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; }
-function refillQueue(){ S.queue = shuffle(QUESTION_BANK); S.qi = 0; }
+function refillQueue(){
+  const pool = subjectSel==="All" ? QUESTION_BANK : QUESTION_BANK.filter(q=>q.subject===subjectSel);
+  S.queue = shuffle(pool); S.qi = 0;
+}
 function currentQ(){ if(S.qi>=S.queue.length) refillQueue(); return S.queue[S.qi]; }
 
 function makeEnemy(i){
@@ -393,18 +495,38 @@ function makeEnemy(i){
   return { name, color, maxHp, hp:maxHp, atk:6 + i*2, xp:20 + i*12, coins:15 + i*6, tier:i+1 };
 }
 
+/* ---- subject tabs (derived from the question bank) ---- */
+let subjectSel = "All";
+function buildSubjectTabs(){
+  const subjects = ["All", ...new Set(QUESTION_BANK.map(q=>q.subject))];
+  const wrap = $('#subtabs'); wrap.innerHTML='';
+  subjects.forEach(s=>{
+    const b=document.createElement('button'); b.type='button';
+    b.className='subtab'+(s===subjectSel?' on':''); b.textContent=s;
+    b.addEventListener('click', ()=>{ subjectSel=s; buildSubjectTabs(); });
+    wrap.appendChild(b);
+  });
+}
+
 /* ---- character select ---- */
 function buildRoster(){
-  const wrap = $('#roster');
+  const wrap = $('#roster'); wrap.innerHTML='';
   CHARACTERS.forEach(c=>{
+    const open = isUnlocked(c);
     const el = document.createElement('button');
-    el.className='hero'; el.style.setProperty('--accent', c.accent);
-    el.innerHTML = `
-      <div class="av" style="font-size:30px;color:${c.accent}">${c.sigil}</div>
+    el.className='hero'+(open?'':' locked'); el.style.setProperty('--accent', c.accent);
+    if(!open) el.disabled = true;
+    const last = open && META.lastChar===c.id ? `<span class="lastused">LAST USED</span>` : '';
+    const lock = open ? '' : `
+      <div class="lockrow">🔒 <span class="goal">${c.unlock.label}</span><br>
+        <span class="prog">${Math.min(META.progress[c.unlock.stat]||0, c.unlock.need)} / ${c.unlock.need}</span></div>`;
+    el.innerHTML = `${last}
+      <div class="av" style="font-size:30px;color:${c.accent}">${open?c.sigil:'🔒'}</div>
       <h3>${c.name}</h3><div class="role">${c.role}</div>
       <p>${c.blurb}</p>
-      <div class="stats"><span><b>HP</b> ${c.maxHp}</span><span><b>PWR</b> ${c.atk}</span></div>`;
-    el.addEventListener('click', ()=>startRun(c));
+      <div class="stats"><span><b>HP</b> ${c.maxHp}</span><span><b>PWR</b> ${c.atk}</span></div>
+      <div class="passive"><b>PASSIVE</b> ${c.buff.label}</div>${lock}`;
+    if(open) el.addEventListener('click', ()=>startRun(c));
     wrap.appendChild(el);
   });
 }
@@ -412,8 +534,9 @@ function buildRoster(){
 function startRun(c){
   SFX.init(); SFX.resume();
   S.player = { name:c.name, accent:c.accent, sigil:c.sigil, level:1, xp:0, xpNext:50,
-               maxHp:c.maxHp, hp:c.maxHp, atk:c.atk, coins:0, streak:0 };
+               maxHp:c.maxHp, hp:c.maxHp, atk:c.atk, coins:0, streak:0, buff:c.buff||{} };
   S.enemyIndex = 0;
+  META.lastChar = c.id; saveMeta();
   document.documentElement.style.setProperty('--accent', c.accent);
   $('#pav').style.setProperty('--accent', c.accent);
   $('#pav').innerHTML = `<span style="font-size:24px;color:${c.accent}">${c.sigil}</span>`;
@@ -494,12 +617,16 @@ function resolve(choiceIndex){
   });
 
   if(correct){
-    const crit = Math.random() < 0.15;
+    const buff = S.player.buff;
+    const crit = Math.random() < 0.15 + (buff.type==="crit" ? buff.add : 0);
     let dmg = S.player.atk * (1 + Math.min(S.player.streak*0.1, 0.5)); // streak scaling, capped at +50%
+    if(buff.type==="dmg") dmg *= 1 + buff.pct;
+    if(buff.type==="subjDmg" && q.subject===buff.subject) dmg *= 1 + buff.pct;
     if(crit) dmg *= 2;
     dmg = Math.round(dmg * (0.9 + Math.random()*0.2));
     S.enemy.hp = Math.max(0, S.enemy.hp - dmg);
     S.player.streak++;
+    bumpProgress('corrects', 1); bumpProgress('bestStreak', S.player.streak, true);
     const el = ELEMENTS[q.subject] || ELEMENTS["A&P"];
     castSpell(el.css, ()=>{
       SFX.hit(crit);
@@ -512,7 +639,8 @@ function resolve(choiceIndex){
     showRationale(q, true);
   } else {
     S.player.streak = Math.floor(S.player.streak/2); // decay, don't zero — one miss shouldn't collapse the multiplier
-    const dmg = Math.round(S.enemy.atk * (0.9 + Math.random()*0.2));
+    let dmg = Math.round(S.enemy.atk * (0.9 + Math.random()*0.2));
+    if(S.player.buff.type==="guard") dmg = Math.round(dmg * (1 - S.player.buff.pct));
     S.player.hp = Math.max(0, S.player.hp - dmg);
     SFX.hurt(); hurtPlayer();
     floatNum($('#pav'), '-'+dmg, 'var(--hplow)', 24);
@@ -532,8 +660,12 @@ function showRationale(q, correct){
 $('#nextBtn').addEventListener('click', ()=>{ S.qi++; loadQuestion(); });
 
 /* ---- xp / level / coins ---- */
-function gainCoins(n){ S.player.coins += n; renderPlayer(); }
+function gainCoins(n){
+  if(S.player.buff.type==="coins") n *= S.player.buff.mult;
+  S.player.coins += n; renderPlayer();
+}
 function gainXp(n){
+  if(S.player.buff.type==="xp") n = Math.round(n * S.player.buff.mult);
   S.player.xp += n;
   while(S.player.xp >= S.player.xpNext){
     S.player.xp -= S.player.xpNext; levelUp();
@@ -543,6 +675,7 @@ function gainXp(n){
 function levelUp(){
   S.player.level++; S.player.maxHp += 8; S.player.atk += 3;
   S.player.hp = S.player.maxHp; S.player.xpNext = 50 * S.player.level;
+  bumpProgress('bestLevel', S.player.level, true);
   SFX.level();
   const lu=$('#levelup'); lu.classList.remove('go'); void lu.offsetWidth; lu.classList.add('go');
 }
@@ -550,12 +683,14 @@ function levelUp(){
 /* ---- win / lose ---- */
 function victory(){
   clearInterval(S.timer);
+  const coinsGot = S.player.buff.type==="coins" ? S.enemy.coins*S.player.buff.mult : S.enemy.coins;
   gainXp(S.enemy.xp); gainCoins(S.enemy.coins);
+  bumpProgress('wins', 1); bumpProgress('bestTier', S.enemy.tier, true);
   SFX.win();
   $('#ovKicker').textContent = 'enemy defeated';
   $('#ovTitle').textContent = 'VICTORY';
   $('#ovTitle').className = 'win';
-  $('#ovRewards').innerHTML = `+<b>${S.enemy.xp}</b> XP · +<b>${S.enemy.coins}</b> ◈ coins · streak kept your vitals up`;
+  $('#ovRewards').innerHTML = `+<b>${S.enemy.xp}</b> XP · +<b>${coinsGot}</b> ◈ coins · streak kept your vitals up`;
   const btn=$('#ovMain'); btn.textContent = 'next enemy ▸';
   btn.onclick = ()=>{ S.enemyIndex++; hideOverlay(); startBattle(); };
   showOverlay();
@@ -573,7 +708,7 @@ function defeat(){
 }
 function showOverlay(){ $('#overlay').classList.remove('hidden'); }
 function hideOverlay(){ $('#overlay').classList.add('hidden'); }
-$('#ovQuit').addEventListener('click', ()=>{ hideOverlay(); $('#battle').classList.add('hidden'); $('#select').classList.remove('hidden'); });
+$('#ovQuit').addEventListener('click', ()=>{ hideOverlay(); $('#battle').classList.add('hidden'); buildRoster(); $('#select').classList.remove('hidden'); });
 
 /* =====================================================================
    4) RENDER + EFFECTS
@@ -632,6 +767,8 @@ document.addEventListener('keydown', e=>{
   if((e.key==='Enter'||e.key===' ') && $('#nextRow').classList.contains('show')){ e.preventDefault(); $('#nextBtn').click(); }
 });
 
+buildSubjectTabs();
+checkUnlocks(); // in case saved progress already satisfies a goal (e.g. after editing a `need`)
 buildRoster();
 
 /* =====================================================================
