@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>CLINICAL QUEST — a study RPG</title>
+<style>
+  /* =====================================================================
+     CLINICAL QUEST — "Prodigy, but for nursing students."
+     Answer questions to cast spells; defeat enemies; level up.
+     Single file, no build step, no dependencies. Double-click to run.
+     Same theme-agnostic idea as before: a quiz ENGINE with a battle skin.
+     Search for  HOOK:  to find where the roadmap features plug in.
+     Aesthetic: a mature clinical-RPG look (not the kiddie Prodigy palette).
+     Your HP is a heart-rate monitor; spells are colored by subject.
+     ===================================================================== */
+  :root{
+    --bg:#0e1420; --bg2:#0a0f18; --panel:#161d2e; --panel2:#1c2740;
+    --line:#26334b; --line2:#37496b;
+    --text:#e9eff8; --muted:#8fa1bd; --dim:#5f7089;
+    /* spell elements (colored by subject — meaning, not decoration) */
+    --vitals:#ff5470;   /* A&P       */
+    --reagent:#2fe0a8;  /* Chemistry */
+    --cell:#b57cff;     /* Biology   */
+    --calc:#ffb454;     /* Math      */
+    --gold:#ffd25f;     /* xp / coins */
+    --hp:#34e07a; --hplow:#ff4d4d; --enemyhp:#ff6b3d;
+    --ui:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; }
+  body{
+    font-family:var(--ui); color:var(--text); overflow:hidden;
+    background:
+      radial-gradient(120% 90% at 50% -20%, #17223a 0%, var(--bg) 55%, var(--bg2) 100%);
+    -webkit-tap-highlight-color:transparent;
+  }
+  /* faint monitor grid — clinical motif */
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; opacity:.35;
+    background-image:
+      linear-gradient(rgba(90,120,160,.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(90,120,160,.06) 1px, transparent 1px);
+    background-size:36px 36px;
+  }
+
+  .screen{ position:fixed; inset:0; display:flex; flex-direction:column; }
+  .hidden{ display:none !important; }
+  .center{ align-items:center; justify-content:center; text-align:center; padding:24px; gap:20px; }
+
+  .eyebrow{ font-family:var(--mono); font-size:12px; letter-spacing:.32em; text-transform:uppercase; color:var(--muted); }
+  h1{ font-size:clamp(34px,7vw,64px); font-weight:900; letter-spacing:-.02em; margin:0; line-height:.95; }
+  h1 .sub{ display:block; font-size:.28em; letter-spacing:.34em; font-weight:600; color:var(--reagent); margin-top:14px; text-transform:uppercase; }
+  .lede{ max-width:520px; color:var(--muted); font-size:15px; line-height:1.6; }
+
+  /* ---------- character select ---------- */
+  .roster{ display:flex; gap:16px; flex-wrap:wrap; justify-content:center; max-width:760px; }
+  .hero{
+    width:210px; text-align:left; background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border:1px solid var(--line); border-radius:16px; padding:18px; cursor:pointer;
+    transition:transform .12s, border-color .15s, box-shadow .15s; position:relative; overflow:hidden;
+  }
+  .hero:hover{ transform:translateY(-4px); border-color:var(--accent); box-shadow:0 12px 30px -12px var(--accent); }
+  .hero:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; }
+  .hero .av{ width:64px; height:64px; border-radius:14px; display:grid; place-items:center; margin-bottom:12px;
+    background:radial-gradient(circle at 40% 30%, color-mix(in srgb, var(--accent) 55%, transparent), transparent 70%), var(--bg2);
+    border:1px solid var(--line2); }
+  .hero h3{ margin:0 0 4px; font-size:18px; }
+  .hero .role{ font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+  .hero p{ margin:10px 0 0; font-size:13px; line-height:1.5; color:var(--muted); }
+  .hero .stats{ margin-top:12px; display:flex; gap:14px; font-family:var(--mono); font-size:12px; color:var(--text); }
+  .hero .stats b{ color:var(--muted); font-weight:400; }
+
+  .btn{ font-family:var(--mono); text-transform:uppercase; letter-spacing:.12em; font-size:13px;
+    padding:14px 24px; border-radius:10px; border:1px solid var(--line2); cursor:pointer;
+    background:var(--panel2); color:var(--text); transition:transform .08s, background .15s, border-color .15s; }
+  .btn:hover{ transform:translateY(-1px); border-color:var(--reagent); }
+  .btn:active{ transform:translateY(1px); }
+  .btn:focus-visible{ outline:3px solid var(--reagent); outline-offset:2px; }
+  .btn.primary{ background:linear-gradient(180deg,#2a9d7a,#1f7a5e); border-color:#2fe0a8; color:#eafff7; }
+  .btn.ghost{ background:transparent; }
+
+  /* ---------- battle ---------- */
+  #battle{ padding:0; }
+  .arena{ position:relative; flex:1; min-height:0; display:flex; flex-direction:column;
+    padding:16px max(16px,env(safe-area-inset-left)) 0; }
+
+  /* enemy */
+  .enemy-wrap{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; gap:14px; }
+  .enemy-bar{ width:min(560px,92%); }
+  .enemy-name{ display:flex; justify-content:space-between; align-items:baseline; font-family:var(--mono);
+    font-size:13px; letter-spacing:.06em; margin-bottom:6px; }
+  .enemy-name .lvl{ color:var(--muted); font-size:11px; }
+  .bar{ height:16px; border-radius:8px; background:#0c1220; border:1px solid var(--line); overflow:hidden; position:relative; }
+  .bar > i{ position:absolute; inset:0; transform-origin:left; transition:width .5s cubic-bezier(.4,0,.2,1); display:block; }
+  .enemy-hp > i{ background:linear-gradient(90deg,#ff8a3d,var(--enemyhp)); }
+  .enemy{ width:170px; height:170px; position:relative; transition:transform .1s; }
+  .enemy.hit{ animation:enemyHit .32s; }
+  @keyframes enemyHit{ 0%,100%{ transform:translateX(0) } 20%{ transform:translateX(-12px) } 40%{ transform:translateX(10px) } 60%{ transform:translateX(-7px) } 80%{ transform:translateX(4px) } }
+  .enemy svg{ width:100%; height:100%; filter:drop-shadow(0 10px 24px rgba(0,0,0,.5)); }
+  .enemy.flash svg{ filter:drop-shadow(0 10px 24px rgba(0,0,0,.5)) brightness(3) saturate(0); }
+
+  /* player panel */
+  .player{ background:linear-gradient(180deg,var(--panel),var(--bg2)); border-top:1px solid var(--line);
+    padding:12px 16px calc(10px + env(safe-area-inset-bottom)); display:flex; gap:14px; align-items:center; }
+  .pav{ width:52px; height:52px; border-radius:12px; flex:none; display:grid; place-items:center;
+    background:radial-gradient(circle at 40% 30%, color-mix(in srgb, var(--accent) 50%, transparent), transparent 70%), var(--bg2);
+    border:1px solid var(--line2); }
+  .pmeta{ flex:1; min-width:0; }
+  .prow1{ display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:12px; }
+  .chip{ padding:2px 8px; border-radius:6px; background:var(--panel2); border:1px solid var(--line2); letter-spacing:.06em; }
+  .chip.lv{ color:var(--gold); border-color:#6a5a20; }
+  .chip.coin{ color:var(--gold); }
+  .chip.streak{ color:var(--reagent); }
+  .hpname{ margin-left:auto; color:var(--muted); }
+  /* HP as heart-rate monitor */
+  .ekg{ position:relative; height:26px; margin-top:7px; border-radius:8px; overflow:hidden;
+    background:#0b1019; border:1px solid var(--line); }
+  .ekg .fill{ position:absolute; inset:0; width:100%; background:linear-gradient(90deg, rgba(52,224,122,.28), rgba(52,224,122,.10));
+    transition:width .45s cubic-bezier(.4,0,.2,1); }
+  .ekg.low .fill{ background:linear-gradient(90deg, rgba(255,77,77,.30), rgba(255,77,77,.10)); }
+  .ekg svg{ position:absolute; inset:0; width:100%; height:100%; }
+  .ekg polyline{ fill:none; stroke:var(--hp); stroke-width:2; }
+  .ekg.low polyline{ stroke:var(--hplow); }
+  .ekg .trace{ stroke-dasharray:600; animation:sweep 2.2s linear infinite; }
+  @keyframes sweep{ from{ stroke-dashoffset:600 } to{ stroke-dashoffset:0 } }
+  .xpbar{ height:5px; margin-top:7px; border-radius:3px; background:#0b1019; border:1px solid var(--line); overflow:hidden; }
+  .xpbar > i{ display:block; height:100%; width:0; background:linear-gradient(90deg,#ffe08a,var(--gold)); transition:width .4s; }
+
+  /* xp meta line */
+  .xpline{ font-family:var(--mono); font-size:10px; letter-spacing:.1em; color:var(--muted); margin-top:4px; }
+
+  /* question panel */
+  .qpanel{ background:var(--panel); border-top:1px solid var(--line2); padding:16px; }
+  .qtop{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .element{ font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; padding:3px 9px;
+    border-radius:6px; border:1px solid var(--el); color:var(--el); }
+  .qtimer{ flex:1; height:6px; border-radius:3px; background:#0b1019; border:1px solid var(--line); overflow:hidden; }
+  .qtimer > i{ display:block; height:100%; width:100%; background:var(--reagent); transition:width .2s linear; }
+  .qtimer.low > i{ background:var(--hplow); }
+  .q{ font-size:clamp(17px,2.6vw,21px); font-weight:700; line-height:1.35; }
+  .choices{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+  @media (max-width:560px){ .choices{ grid-template-columns:1fr; } }
+  .choice{ text-align:left; font-family:var(--ui); font-size:15px; padding:13px 14px; border-radius:10px;
+    border:1px solid var(--line2); background:var(--panel2); color:var(--text); cursor:pointer;
+    display:flex; gap:10px; align-items:center; transition:transform .07s, background .12s, border-color .12s; }
+  .choice:hover{ transform:translateX(2px); border-color:var(--reagent); }
+  .choice:focus-visible{ outline:3px solid var(--reagent); outline-offset:2px; }
+  .choice .k{ font-family:var(--mono); font-size:11px; border:1px solid var(--line2); border-radius:5px; padding:2px 6px; flex:none; color:var(--muted); }
+  .choice.correct{ background:rgba(47,224,168,.16); border-color:var(--reagent); }
+  .choice.wrong{ background:rgba(255,77,77,.16); border-color:var(--hplow); }
+  .choice.lock{ pointer-events:none; opacity:.5; }
+  .choice.lock.correct,.choice.lock.wrong{ opacity:1; }
+  .rationale{ margin-top:14px; font-size:14px; line-height:1.6; color:var(--muted); display:none;
+    border-left:2px solid var(--line2); padding-left:12px; }
+  .rationale.show{ display:block; }
+  .rationale b{ color:var(--text); }
+  .nextrow{ margin-top:14px; display:none; justify-content:flex-end; }
+  .nextrow.show{ display:flex; }
+
+  /* floating combat numbers + projectile */
+  .float{ position:fixed; z-index:60; font-family:var(--ui); font-weight:900; pointer-events:none;
+    text-shadow:0 2px 6px rgba(0,0,0,.6); animation:floatUp 1s ease-out forwards; }
+  @keyframes floatUp{ 0%{ transform:translate(-50%,0) scale(.7); opacity:0 } 15%{ opacity:1; transform:translate(-50%,-8px) scale(1.15) } 100%{ transform:translate(-50%,-58px) scale(1); opacity:0 } }
+  .bolt{ position:fixed; z-index:55; width:22px; height:22px; border-radius:50%; pointer-events:none;
+    box-shadow:0 0 18px 6px currentColor; background:currentColor; }
+  .screenflash{ position:fixed; inset:0; z-index:50; pointer-events:none; background:var(--hplow); opacity:0; }
+  body.hurt .screenflash{ animation:hurt .34s; }
+  @keyframes hurt{ 0%{ opacity:0 } 25%{ opacity:.28 } 100%{ opacity:0 } }
+  body.shake #battle{ animation:shk .34s; }
+  @keyframes shk{ 0%,100%{ transform:translate(0,0) } 25%{ transform:translate(-6px,3px) } 50%{ transform:translate(5px,-4px) } 75%{ transform:translate(-3px,2px) } }
+
+  /* overlays */
+  .overlay{ position:fixed; inset:0; z-index:70; background:rgba(6,10,18,.82); backdrop-filter:blur(4px);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; text-align:center; padding:24px; }
+  .overlay h2{ font-size:clamp(30px,7vw,54px); font-weight:900; margin:0; letter-spacing:-.02em; }
+  .overlay .win{ color:var(--gold); } .overlay .lose{ color:var(--hplow); }
+  .rewards{ font-family:var(--mono); font-size:13px; color:var(--muted); letter-spacing:.06em; }
+  .rewards b{ color:var(--gold); }
+  .levelup{ position:fixed; inset:0; z-index:65; display:grid; place-items:center; pointer-events:none; opacity:0; }
+  .levelup.go{ animation:lvl 1.1s ease-out; }
+  .levelup span{ font-size:clamp(30px,8vw,60px); font-weight:900; color:var(--gold); text-shadow:0 0 30px rgba(255,210,95,.7); }
+  @keyframes lvl{ 0%{ opacity:0; transform:scale(.6) } 25%{ opacity:1; transform:scale(1.1) } 75%{ opacity:1; transform:scale(1) } 100%{ opacity:0; transform:scale(1) } }
+
+  .soundnote{ position:fixed; bottom:6px; left:0; right:0; text-align:center; font-family:var(--mono);
+    font-size:10px; letter-spacing:.1em; color:var(--muted); opacity:.4; pointer-events:none; }
+
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; } .ekg .trace{ stroke-dashoffset:0; } }
+</style>
+</head>
+<body>
+  <div class="screenflash"></div>
+
+  <!-- ===== CHARACTER SELECT ===== -->
+  <section id="select" class="screen center">
+    <div class="eyebrow">choose your student</div>
+    <h1>CLINICAL QUEST<span class="sub">a nursing / teas study rpg</span></h1>
+    <p class="lede">Answer to cast. Every right answer hits the enemy; every miss hits you.
+      Beat it before your vitals flatline. Pick who you're taking into the ward.</p>
+    <div class="roster" id="roster"></div>
+    <div class="eyebrow" style="opacity:.6">↑ tap a student to start · you can customize looks later</div>
+  </section>
+
+  <!-- ===== BATTLE ===== -->
+  <section id="battle" class="screen hidden">
+    <div class="arena">
+      <div class="enemy-wrap">
+        <div class="enemy-bar">
+          <div class="enemy-name"><span id="enemyName">—</span><span class="lvl" id="enemyLvl">—</span></div>
+          <div class="bar enemy-hp"><i id="enemyHpFill"></i></div>
+        </div>
+        <div class="enemy" id="enemy"></div>
+      </div>
+    </div>
+
+    <div class="player">
+      <div class="pav" id="pav"></div>
+      <div class="pmeta">
+        <div class="prow1">
+          <span class="chip lv" id="lvChip">LV 1</span>
+          <span class="chip coin" id="coinChip">◈ 0</span>
+          <span class="chip streak" id="streakChip">⚡ 0</span>
+          <span class="hpname" id="hpName">— HP <b id="hpNum">0/0</b></span>
+        </div>
+        <div class="ekg" id="ekg">
+          <div class="fill" id="hpFill"></div>
+          <svg viewBox="0 0 300 26" preserveAspectRatio="none"><polyline class="trace" id="ekgLine"
+            points="0,13 40,13 52,13 60,3 68,23 78,13 120,13 132,13 140,6 148,20 158,13 300,13"/></svg>
+        </div>
+        <div class="xpbar"><i id="xpFill"></i></div>
+        <div class="xpline" id="xpLine">XP 0 / 50</div>
+      </div>
+    </div>
+
+    <div class="qpanel">
+      <div class="qtop">
+        <span class="element" id="element" style="--el:var(--reagent)">—</span>
+        <div class="qtimer" id="qtimer"><i id="qtimerFill"></i></div>
+      </div>
+      <div class="q" id="qText">—</div>
+      <div class="choices" id="choices"></div>
+      <div class="rationale" id="rationale"></div>
+      <div class="nextrow" id="nextRow"><button class="btn primary" id="nextBtn">continue ▸</button></div>
+    </div>
+  </section>
+
+  <!-- ===== VICTORY / DEFEAT ===== -->
+  <div id="overlay" class="overlay hidden">
+    <div class="eyebrow" id="ovKicker">—</div>
+    <h2 id="ovTitle">—</h2>
+    <div class="rewards" id="ovRewards"></div>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center">
+      <button class="btn primary" id="ovMain">—</button>
+      <button class="btn ghost" id="ovQuit">back to select</button>
+    </div>
+  </div>
+
+  <div class="levelup" id="levelup"><span>LEVEL UP</span></div>
+  <div class="soundnote">🔊 sound on for spell &amp; hit effects</div>
+
+<script>
+/* =====================================================================
+   1) QUESTION BANK (shared with the other prototype — same 62 questions)
+   HOOK: swap this for Claude-API-generated questions for an infinite bank.
+   ===================================================================== */
+const QUESTION_BANK = [
+  {subject:"A&P", chapter:"Cells", q:"Which organelle is the main site of ATP production?", choices:["Nucleus","Mitochondria","Ribosome","Golgi apparatus"], answer:1, why:"Mitochondria run oxidative phosphorylation — the cell's main ATP source."},
+  {subject:"A&P", chapter:"Cells", q:"Ribosomes are responsible for:", choices:["Lipid storage","Protein synthesis","DNA replication","Waste breakdown"], answer:1, why:"Ribosomes read mRNA and build proteins (translation)."},
+  {subject:"A&P", chapter:"Genetics", q:"A typical human body cell contains how many chromosomes?", choices:["23","46","48","92"], answer:1, why:"46 total — 23 pairs. Gametes carry half: 23."},
+  {subject:"A&P", chapter:"Renal", q:"The functional unit of the kidney is the:", choices:["Alveolus","Nephron","Neuron","Villus"], answer:1, why:"Each kidney has ~1 million nephrons that filter blood and form urine."},
+  {subject:"A&P", chapter:"Cardiovascular", q:"A normal resting heart rate for a healthy adult is:", choices:["20–40 bpm","60–100 bpm","100–140 bpm","140–180 bpm"], answer:1, why:"60–100 bpm. Below 60 = bradycardia, above 100 = tachycardia."},
+  {subject:"A&P", chapter:"Respiratory", q:"Gas exchange in the lungs occurs in the:", choices:["Bronchi","Trachea","Alveoli","Pleura"], answer:2, why:"Alveoli are thin sacs where O₂ enters blood and CO₂ leaves."},
+  {subject:"A&P", chapter:"Integumentary", q:"The largest organ of the human body is the:", choices:["Liver","Skin","Lungs","Small intestine"], answer:1, why:"Skin — barrier, temperature control, and sensation."},
+  {subject:"A&P", chapter:"Nervous", q:"Cranial nerve II (the optic nerve) carries information for:", choices:["Smell","Vision","Hearing","Taste"], answer:1, why:"CN II = optic = vision."},
+  {subject:"A&P", chapter:"Nervous", q:"The vagus nerve is which cranial nerve?", choices:["CN V","CN VII","CN X","CN XII"], answer:2, why:"The vagus is CN X — the main parasympathetic nerve to heart, lungs, and gut."},
+  {subject:"A&P", chapter:"Endocrine", q:"Which hormone LOWERS blood glucose?", choices:["Glucagon","Insulin","Cortisol","Adrenaline"], answer:1, why:"Insulin (beta cells) moves glucose into cells. Glucagon raises blood sugar."},
+  {subject:"A&P", chapter:"Blood", q:"The protein in red blood cells that carries oxygen is:", choices:["Albumin","Hemoglobin","Fibrin","Keratin"], answer:1, why:"Hemoglobin binds O₂ in the lungs and releases it in tissues."},
+  {subject:"A&P", chapter:"Muscular", q:"Contracting the biceps brachii causes the elbow to:", choices:["Extend","Flex","Rotate outward","Lock straight"], answer:1, why:"The biceps is a flexor; the triceps extends the elbow."},
+  {subject:"A&P", chapter:"Cardiovascular", q:"During systole, the ventricles are:", choices:["Relaxing and filling","Contracting and ejecting blood","Closed off completely","Refilling the atria"], answer:1, why:"Systole = contraction/ejection. Diastole = relaxation/filling."},
+  {subject:"A&P", chapter:"Homeostasis", q:"Normal core body temperature is approximately:", choices:["35 °C","37 °C","39 °C","41 °C"], answer:1, why:"~37 °C (98.6 °F). Above ~38 °C is generally a fever."},
+  {subject:"A&P", chapter:"Tissues", q:"Which is NOT one of the four primary tissue types?", choices:["Epithelial","Connective","Vascular","Muscle"], answer:2, why:"The four are epithelial, connective, muscle, nervous. 'Vascular' isn't a tissue type."},
+  {subject:"A&P", chapter:"Skeletal", q:"How many bones are in the adult human skeleton?", choices:["186","206","226","246"], answer:1, why:"206 in adults. Babies start with ~270; many fuse."},
+  {subject:"A&P", chapter:"Skeletal", q:"The longest and strongest bone in the body is the:", choices:["Tibia","Humerus","Femur","Sternum"], answer:2, why:"The femur (thigh bone)."},
+  {subject:"A&P", chapter:"Muscular", q:"The basic contractile unit of a skeletal muscle fiber is the:", choices:["Sarcomere","Nephron","Alveolus","Synapse"], answer:0, why:"Sarcomeres are the actin–myosin units that shorten to contract muscle."},
+  {subject:"A&P", chapter:"Cardiovascular", q:"The heart's natural pacemaker is the:", choices:["AV node","SA node","Bundle of His","Purkinje fibers"], answer:1, why:"The SA node fires the impulses that set the rhythm."},
+  {subject:"A&P", chapter:"Cardiovascular", q:"After leaving the right ventricle, blood travels next to the:", choices:["Aorta","Left atrium","Lungs","Body tissues"], answer:2, why:"The right ventricle pumps blood to the lungs to pick up oxygen."},
+  {subject:"A&P", chapter:"Respiratory", q:"When the diaphragm contracts and flattens, it causes:", choices:["Exhalation","Inhalation","Coughing","Breath-holding"], answer:1, why:"A contracting diaphragm enlarges the chest, so air flows in — inhalation."},
+  {subject:"A&P", chapter:"Digestive", q:"Most nutrient absorption takes place in the:", choices:["Stomach","Large intestine","Small intestine","Esophagus"], answer:2, why:"The small intestine's villi absorb most nutrients."},
+  {subject:"A&P", chapter:"Skeletal", q:"Which cells BUILD new bone tissue?", choices:["Osteoclasts","Osteoblasts","Osteocytes","Chondrocytes"], answer:1, why:"Osteoblasts Build bone; osteoclasts break it down."},
+  {subject:"A&P", chapter:"Nervous", q:"The 'fight or flight' response is driven by which division?", choices:["Parasympathetic","Sympathetic","Somatic","Central"], answer:1, why:"Sympathetic = fight-or-flight; parasympathetic = rest and digest."},
+  {subject:"A&P", chapter:"Endocrine", q:"Often called the 'master gland,' the ___ regulates many others.", choices:["Thyroid","Pituitary","Adrenal","Pancreas"], answer:1, why:"The pituitary secretes hormones that control other glands."},
+  {subject:"A&P", chapter:"Blood", q:"The main job of white blood cells is to:", choices:["Carry oxygen","Form clots","Fight infection","Transport hormones"], answer:2, why:"White blood cells defend against pathogens."},
+  {subject:"Chemistry", chapter:"Atoms", q:"Which subatomic particle carries a positive charge?", choices:["Electron","Neutron","Proton","Photon"], answer:2, why:"Protons +, electrons −, neutrons neutral."},
+  {subject:"Chemistry", chapter:"Atoms", q:"An atom's mass number equals the number of:", choices:["Protons only","Protons + electrons","Protons + neutrons","Neutrons only"], answer:2, why:"Mass number = protons + neutrons."},
+  {subject:"Chemistry", chapter:"Atoms", q:"Isotopes of an element share the same protons but differ in:", choices:["Electrons","Neutrons","Atoms","Charge"], answer:1, why:"Isotopes differ only in neutron count."},
+  {subject:"Chemistry", chapter:"Bonds", q:"An ionic bond forms when electrons are:", choices:["Shared equally","Transferred between atoms","Destroyed","Turned into protons"], answer:1, why:"Ionic = transfer of electrons. Covalent = sharing."},
+  {subject:"Chemistry", chapter:"Acids & Bases", q:"A substance with a pH of 3 is:", choices:["Acidic","Neutral","Basic","Nonreactive"], answer:0, why:"Below 7 acidic, 7 neutral, above 7 basic."},
+  {subject:"Chemistry", chapter:"Water", q:"Water is called the 'universal solvent' because it is:", choices:["Nonpolar","Polar","Acidic","Inert"], answer:1, why:"Its polarity dissolves many ionic and polar substances."},
+  {subject:"Chemistry", chapter:"Reactions", q:"A catalyst (like an enzyme) speeds a reaction by:", choices:["Being used up","Raising activation energy","Lowering activation energy","Adding heat"], answer:2, why:"Catalysts lower activation energy and aren't consumed."},
+  {subject:"Chemistry", chapter:"Solutions", q:"In saltwater, the salt is the ___ and water is the ___.", choices:["solvent / solute","solute / solvent","acid / base","ion / molecule"], answer:1, why:"Solute is dissolved (salt); solvent dissolves (water)."},
+  {subject:"Chemistry", chapter:"Tonicity", q:"A red blood cell placed in a HYPOTONIC solution will:", choices:["Shrink","Swell and possibly burst","Stay the same","Become plasma"], answer:1, why:"Less solute outside → water moves in → cell swells. Key for IV fluids."},
+  {subject:"Chemistry", chapter:"Tonicity", q:"Osmosis is the movement of ___ across a semipermeable membrane.", choices:["Salt","Water","Protein","Oxygen"], answer:1, why:"Osmosis is water moving toward higher solute concentration."},
+  {subject:"Chemistry", chapter:"States", q:"Converting a liquid to a gas is called:", choices:["Condensation","Vaporization","Sublimation","Deposition"], answer:1, why:"Liquid → gas is vaporization (evaporation/boiling)."},
+  {subject:"Chemistry", chapter:"Reactions", q:"In a chemical reaction, the starting substances are called:", choices:["Products","Reactants","Catalysts","Solutes"], answer:1, why:"Reactants → products."},
+  {subject:"Biology", chapter:"Cells", q:"Which cell type lacks a true (membrane-bound) nucleus?", choices:["Eukaryotic","Prokaryotic","Plant cell","Animal cell"], answer:1, why:"Prokaryotes (bacteria) have no membrane-bound nucleus."},
+  {subject:"Biology", chapter:"Cells", q:"The cell membrane is mainly made of a:", choices:["Single protein layer","Phospholipid bilayer","Carbohydrate shell","Cellulose wall"], answer:1, why:"A phospholipid bilayer forms a selectively permeable boundary."},
+  {subject:"Biology", chapter:"DNA & RNA", q:"Which base appears in RNA but NOT DNA?", choices:["Adenine","Thymine","Uracil","Guanine"], answer:2, why:"RNA uses uracil where DNA uses thymine."},
+  {subject:"Biology", chapter:"Protein Synthesis", q:"The correct flow of genetic information is:", choices:["RNA → DNA → protein","DNA → RNA → protein","Protein → DNA → RNA","DNA → protein → RNA"], answer:1, why:"DNA → RNA → protein (transcription, then translation)."},
+  {subject:"Biology", chapter:"Cell Division", q:"Meiosis produces:", choices:["Two identical diploid cells","Four varied haploid cells","One large cell","Two nuclei only"], answer:1, why:"Meiosis → four haploid gametes with variation; mitosis → two identical diploid cells."},
+  {subject:"Biology", chapter:"Cell Division", q:"The correct order of mitosis phases is:", choices:["Meta, Pro, Ana, Telo","Pro, Meta, Ana, Telo","Ana, Telo, Pro, Meta","Telo, Ana, Meta, Pro"], answer:1, why:"Prophase → Metaphase → Anaphase → Telophase (PMAT)."},
+  {subject:"Biology", chapter:"Genetics", q:"An organism's observable physical traits make up its:", choices:["Genotype","Phenotype","Allele","Chromosome"], answer:1, why:"Phenotype = observable traits; genotype = genetic code."},
+  {subject:"Biology", chapter:"Genetics", q:"A recessive trait is expressed only when:", choices:["One recessive allele is present","Two recessive alleles are present","A dominant allele is present","The gene is on the X chromosome"], answer:1, why:"Two recessive alleles are needed; a dominant allele masks it."},
+  {subject:"Biology", chapter:"Cellular Energy", q:"The main energy-carrying molecule in cells is:", choices:["DNA","ATP","Glucose","Hemoglobin"], answer:1, why:"ATP stores and delivers energy for cellular work."},
+  {subject:"Biology", chapter:"Transport", q:"Active transport differs from diffusion because it:", choices:["Requires ATP and can move against the gradient","Never uses proteins","Only moves water","Always moves high to low"], answer:0, why:"Active transport spends ATP to pump against the gradient."},
+  {subject:"Biology", chapter:"Enzymes", q:"Enzymes are biological catalysts made mostly of:", choices:["Lipids","Proteins","Carbohydrates","Nucleic acids"], answer:1, why:"Most enzymes are proteins that speed reactions."},
+  {subject:"Math", chapter:"Metric Conversions", q:"How many milliliters are in 1 liter?", choices:["10","100","1,000","10,000"], answer:2, why:"1 L = 1,000 mL (also 1 g = 1,000 mg)."},
+  {subject:"Math", chapter:"Dosage", q:"An order reads 0.5 g. Tablets are 250 mg each. How many tablets?", choices:["1","2","4","½"], answer:1, why:"0.5 g = 500 mg; 500 ÷ 250 = 2 tablets."},
+  {subject:"Math", chapter:"Percentages", q:"What is 25% of 80?", choices:["16","20","25","32"], answer:1, why:"0.25 × 80 = 20."},
+  {subject:"Math", chapter:"Decimals & Percents", q:"The decimal 0.5 equals:", choices:["5%","0.05%","50%","500%"], answer:2, why:"0.5 = 50%."},
+  {subject:"Math", chapter:"Statistics", q:"What is the mean of 2, 4, 6, and 8?", choices:["4","5","6","20"], answer:1, why:"Sum 20 ÷ 4 = 5."},
+  {subject:"Math", chapter:"Order of Operations", q:"Using order of operations, 2 + 3 × 4 = ?", choices:["20","14","24","11"], answer:1, why:"Multiply first: 3×4=12, then +2 = 14."},
+  {subject:"Math", chapter:"Metric Conversions", q:"Convert 1.5 kilograms to grams.", choices:["15 g","150 g","1,500 g","15,000 g"], answer:2, why:"1 kg = 1,000 g → 1,500 g."},
+  {subject:"Math", chapter:"Proportions", q:"If 2 tablets contain 500 mg total, how many mg are in 5 tablets?", choices:["1,000 mg","1,250 mg","1,500 mg","2,500 mg"], answer:1, why:"250 mg each × 5 = 1,250 mg."},
+  {subject:"Math", chapter:"Fractions", q:"The fraction 3/4 written as a percent is:", choices:["34%","43%","75%","0.75%"], answer:2, why:"3 ÷ 4 = 0.75 = 75%."},
+  {subject:"Math", chapter:"Roman Numerals", q:"The Roman numeral IX represents:", choices:["6","9","11","19"], answer:1, why:"IX = 10 − 1 = 9."},
+];
+
+/* subject → spell (color encodes the element) */
+const ELEMENTS = {
+  "A&P":       {spell:"Vitals Surge",  css:"var(--vitals)"},
+  "Chemistry": {spell:"Reagent Blast", css:"var(--reagent)"},
+  "Biology":   {spell:"Cell Burst",    css:"var(--cell)"},
+  "Math":      {spell:"Calc Strike",   css:"var(--calc)"},
+};
+
+/* selectable students (Gacha-style pick; customization is a roadmap HOOK) */
+const CHARACTERS = [
+  {id:"icu",   name:"ICU Recruit",     role:"balanced",     accent:"#2fe0a8", maxHp:46, atk:10, sigil:"⬡", blurb:"Steady under pressure. No glaring weakness."},
+  {id:"night", name:"Night-Shift Vet", role:"tank",         accent:"#b57cff", maxHp:56, atk:8,  sigil:"◈", blurb:"High HP. Survives long fights and bad streaks."},
+  {id:"trauma",name:"Trauma Junkie",   role:"glass cannon", accent:"#ff5470", maxHp:38, atk:13, sigil:"✦", blurb:"Hits hard, folds fast. High risk, high damage."},
+];
+
+const ENEMIES = ["Pop-Quiz Gremlin","The Cram Wraith","Clinical-Skills Ogre","Pharm Hydra","Anatomy Behemoth","Final Boss: The Proctor"];
+const ENEMY_COLORS = ["#ff6b3d","#c04bd6","#4b8bff","#e0b83a","#4be089","#ff3d5e"];
+
+/* =====================================================================
+   2) SOUND (Web Audio, synthesized — offline; game feel)
+   ===================================================================== */
+const SFX = (()=>{
+  let ctx, ready=false;
+  function init(){ if(ready) return; ctx=new (window.AudioContext||window.webkitAudioContext)(); ready=true; }
+  function resume(){ if(ctx&&ctx.state==='suspended') ctx.resume(); }
+  function tone(freq,start,dur,type,peak){ if(!ready)return; const o=ctx.createOscillator(),g=ctx.createGain();
+    o.type=type; o.frequency.value=freq; o.connect(g).connect(ctx.destination); const t=ctx.currentTime+start;
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(peak,t+dur*0.2); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.start(t); o.stop(t+dur+0.05); }
+  function noise(dur,peak){ if(!ready)return; const n=Math.floor(ctx.sampleRate*dur),b=ctx.createBuffer(1,n,ctx.sampleRate),d=b.getChannelData(0);
+    for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n); const s=ctx.createBufferSource(); s.buffer=b;
+    const g=ctx.createGain(); g.gain.value=peak; s.connect(g).connect(ctx.destination); s.start(); }
+  return {
+    init, resume,
+    cast(){ tone(660,0,0.18,'triangle',0.14); tone(990,0.05,0.22,'sine',0.10); },
+    hit(crit){ noise(0.12,0.18); tone(crit?520:330,0,0.22,'square',crit?0.2:0.14); if(crit) tone(880,0.04,0.3,'sawtooth',0.16); },
+    hurt(){ tone(150,0,0.4,'sawtooth',0.22); noise(0.18,0.12); },
+    level(){ [523,659,784,1046].forEach((f,i)=>tone(f,i*0.09,0.5,'triangle',0.15)); },
+    win(){ [523,659,784,1046,1318].forEach((f,i)=>tone(f,i*0.11,0.6,'triangle',0.16)); },
+    lose(){ const o=ctx&&ctx.createOscillator(); if(!o)return; const g=ctx.createGain(); o.type='sawtooth';
+      o.connect(g).connect(ctx.destination); const t=ctx.currentTime; o.frequency.setValueAtTime(300,t);
+      o.frequency.exponentialRampToValueAtTime(60,t+1); g.gain.setValueAtTime(0.22,t); g.gain.linearRampToValueAtTime(0,t+1.1); o.start(t); o.stop(t+1.2); },
+  };
+})();
+
+/* =====================================================================
+   3) GAME STATE + LOGIC
+   ===================================================================== */
+const $ = s => document.querySelector(s);
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const rint = (a,b)=> a + Math.floor(Math.random()*(b-a+1));
+
+const S = { player:null, enemy:null, enemyIndex:0, queue:[], qi:0, answering:false, qStart:0, timer:null, timeLeft:0 };
+const TIME_PER_Q = 18;
+
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function refillQueue(){ S.queue = shuffle(QUESTION_BANK); S.qi = 0; }
+function currentQ(){ if(S.qi>=S.queue.length) refillQueue(); return S.queue[S.qi]; }
+
+function makeEnemy(i){
+  const name = ENEMIES[Math.min(i, ENEMIES.length-1)];
+  const color = ENEMY_COLORS[i % ENEMY_COLORS.length];
+  const maxHp = 30 + i*22;
+  return { name, color, maxHp, hp:maxHp, atk:6 + i*2, xp:20 + i*12, coins:15 + i*6, tier:i+1 };
+}
+
+/* ---- character select ---- */
+function buildRoster(){
+  const wrap = $('#roster');
+  CHARACTERS.forEach(c=>{
+    const el = document.createElement('button');
+    el.className='hero'; el.style.setProperty('--accent', c.accent);
+    el.innerHTML = `
+      <div class="av" style="font-size:30px;color:${c.accent}">${c.sigil}</div>
+      <h3>${c.name}</h3><div class="role">${c.role}</div>
+      <p>${c.blurb}</p>
+      <div class="stats"><span><b>HP</b> ${c.maxHp}</span><span><b>PWR</b> ${c.atk}</span></div>`;
+    el.addEventListener('click', ()=>startRun(c));
+    wrap.appendChild(el);
+  });
+}
+
+function startRun(c){
+  SFX.init(); SFX.resume();
+  S.player = { name:c.name, accent:c.accent, sigil:c.sigil, level:1, xp:0, xpNext:50,
+               maxHp:c.maxHp, hp:c.maxHp, atk:c.atk, coins:0, streak:0 };
+  S.enemyIndex = 0;
+  document.documentElement.style.setProperty('--accent', c.accent);
+  $('#pav').style.setProperty('--accent', c.accent);
+  $('#pav').innerHTML = `<span style="font-size:24px;color:${c.accent}">${c.sigil}</span>`;
+  refillQueue();
+  $('#select').classList.add('hidden');
+  $('#battle').classList.remove('hidden');
+  startBattle();
+}
+
+function startBattle(){
+  S.enemy = makeEnemy(S.enemyIndex);
+  const en = $('#enemy');
+  en.innerHTML = enemySVG(S.enemy.color);
+  $('#enemyName').textContent = S.enemy.name;
+  $('#enemyLvl').textContent = `TIER ${S.enemy.tier} · HP ${S.enemy.maxHp}`;
+  renderPlayer(); renderEnemyHp();
+  loadQuestion();
+}
+
+function enemySVG(color){
+  // original creature (no copyrighted characters) — a floating study-wraith
+  return `<svg viewBox="0 0 120 120" role="img" aria-label="enemy">
+    <defs><radialGradient id="eg" cx="45%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="${color}"/><stop offset="100%" stop-color="#10131f"/></radialGradient></defs>
+    <path d="M60 12 C88 12 104 34 104 62 C104 84 96 104 88 108 C84 98 78 98 74 108
+             C70 100 64 100 60 108 C56 100 50 100 46 108 C42 98 36 98 32 108
+             C24 104 16 84 16 62 C16 34 32 12 60 12 Z" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <circle cx="46" cy="54" r="8" fill="#0b0e16"/><circle cx="74" cy="54" r="8" fill="#0b0e16"/>
+    <circle cx="48" cy="52" r="3" fill="${color}"/><circle cx="76" cy="52" r="3" fill="${color}"/>
+    <path d="M44 78 Q60 88 76 78" fill="none" stroke="#0b0e16" stroke-width="3" stroke-linecap="round"/>
+  </svg>`;
+}
+
+/* ---- questions ---- */
+function loadQuestion(){
+  S.answering = false; S.qStart = performance.now();
+  const q = currentQ();
+  const el = ELEMENTS[q.subject] || ELEMENTS["A&P"];
+  const elBadge = $('#element');
+  elBadge.textContent = el.spell; elBadge.style.setProperty('--el', el.css);
+  $('#qText').textContent = q.q;
+  const wrap = $('#choices'); wrap.innerHTML='';
+  const keys=['A','B','C','D'];
+  q.choices.forEach((c,i)=>{
+    const b=document.createElement('button'); b.className='choice'; b.type='button';
+    b.innerHTML=`<span class="k">${keys[i]}</span><span>${c}</span>`;
+    b.addEventListener('click', ()=>choose(i));
+    wrap.appendChild(b);
+  });
+  $('#rationale').classList.remove('show'); $('#rationale').innerHTML='';
+  $('#nextRow').classList.remove('show');
+  startTimer();
+}
+
+function startTimer(){
+  clearInterval(S.timer); S.timeLeft = TIME_PER_Q;
+  const fill=$('#qtimerFill'), bar=$('#qtimer'); fill.style.width='100%'; bar.classList.remove('low');
+  S.timer = setInterval(()=>{
+    S.timeLeft -= 0.1;
+    fill.style.width = Math.max(0, S.timeLeft/TIME_PER_Q*100)+'%';
+    if(S.timeLeft <= TIME_PER_Q*0.3) bar.classList.add('low');
+    if(S.timeLeft <= 0){ clearInterval(S.timer); if(!S.answering) resolve(-1); }
+  }, 100);
+}
+
+function choose(i){ if(S.answering) return; resolve(i); }
+
+function resolve(choiceIndex){
+  S.answering = true; clearInterval(S.timer);
+  const q = currentQ();
+  const correct = choiceIndex === q.answer;
+  // lock choices, show right/wrong
+  document.querySelectorAll('.choice').forEach((el,idx)=>{
+    el.classList.add('lock');
+    if(idx===q.answer) el.classList.add('correct');
+    if(idx===choiceIndex && !correct) el.classList.add('wrong');
+  });
+
+  if(correct){
+    const secs = (performance.now()-S.qStart)/1000;
+    const fast = secs < 6;
+    const crit = Math.random() < 0.15;
+    let dmg = S.player.atk * (1 + Math.min(S.player.streak*0.1, 1)); // streak scaling
+    if(fast) dmg *= 1.25;
+    if(crit) dmg *= 2;
+    dmg = Math.round(dmg * (0.9 + Math.random()*0.2));
+    S.enemy.hp = Math.max(0, S.enemy.hp - dmg);
+    S.player.streak++;
+    const el = ELEMENTS[q.subject] || ELEMENTS["A&P"];
+    castSpell(el.css, ()=>{
+      SFX.hit(crit);
+      hitEnemy();
+      floatNum($('#enemy'), (crit?'CRIT ':'')+dmg, crit?'var(--gold)':el.css, crit?30:24);
+      renderEnemyHp();
+      gainXp(4); gainCoins(3);
+      if(S.enemy.hp<=0){ setTimeout(victory, 620); }
+    });
+    showRationale(q, true);
+  } else {
+    S.player.streak = 0;
+    const dmg = Math.round(S.enemy.atk * (0.9 + Math.random()*0.2));
+    S.player.hp = Math.max(0, S.player.hp - dmg);
+    SFX.hurt(); hurtPlayer();
+    floatNum($('#pav'), '-'+dmg, 'var(--hplow)', 24);
+    renderPlayer();
+    showRationale(q, false);
+    if(S.player.hp<=0){ setTimeout(defeat, 500); }
+  }
+}
+
+function showRationale(q, correct){
+  const r=$('#rationale');
+  r.innerHTML = `<b>${correct?'✓ Hit — ':'✗ Missed — '}</b>${q.why}`;
+  r.classList.add('show');
+  if(S.enemy.hp>0 && S.player.hp>0){ $('#nextRow').classList.add('show'); $('#nextBtn').focus(); }
+}
+
+$('#nextBtn').addEventListener('click', ()=>{ S.qi++; loadQuestion(); });
+
+/* ---- xp / level / coins ---- */
+function gainCoins(n){ S.player.coins += n; renderPlayer(); }
+function gainXp(n){
+  S.player.xp += n;
+  while(S.player.xp >= S.player.xpNext){
+    S.player.xp -= S.player.xpNext; levelUp();
+  }
+  renderPlayer();
+}
+function levelUp(){
+  S.player.level++; S.player.maxHp += 8; S.player.atk += 3;
+  S.player.hp = S.player.maxHp; S.player.xpNext = 50 * S.player.level;
+  SFX.level();
+  const lu=$('#levelup'); lu.classList.remove('go'); void lu.offsetWidth; lu.classList.add('go');
+}
+
+/* ---- win / lose ---- */
+function victory(){
+  clearInterval(S.timer);
+  gainXp(S.enemy.xp); gainCoins(S.enemy.coins);
+  SFX.win();
+  $('#ovKicker').textContent = 'enemy defeated';
+  $('#ovTitle').textContent = 'VICTORY';
+  $('#ovTitle').className = 'win';
+  $('#ovRewards').innerHTML = `+<b>${S.enemy.xp}</b> XP · +<b>${S.enemy.coins}</b> ◈ coins · streak kept your vitals up`;
+  const btn=$('#ovMain'); btn.textContent = 'next enemy ▸';
+  btn.onclick = ()=>{ S.enemyIndex++; hideOverlay(); startBattle(); };
+  showOverlay();
+}
+function defeat(){
+  clearInterval(S.timer);
+  SFX.lose();
+  $('#ovKicker').textContent = 'your vitals flatlined';
+  $('#ovTitle').textContent = 'DOWN';
+  $('#ovTitle').className = 'lose';
+  $('#ovRewards').innerHTML = `You keep your level, XP, and coins. Same enemy — go again.`;
+  const btn=$('#ovMain'); btn.textContent = 'retry ▸';
+  btn.onclick = ()=>{ S.player.hp = S.player.maxHp; S.player.streak=0; hideOverlay(); startBattle(); };
+  showOverlay();
+}
+function showOverlay(){ $('#overlay').classList.remove('hidden'); }
+function hideOverlay(){ $('#overlay').classList.add('hidden'); }
+$('#ovQuit').addEventListener('click', ()=>{ hideOverlay(); $('#battle').classList.add('hidden'); $('#select').classList.remove('hidden'); });
+
+/* =====================================================================
+   4) RENDER + EFFECTS
+   ===================================================================== */
+function renderEnemyHp(){ $('#enemyHpFill').style.width = (S.enemy.hp/S.enemy.maxHp*100)+'%'; }
+function renderPlayer(){
+  const p=S.player;
+  $('#lvChip').textContent = `LV ${p.level}`;
+  $('#coinChip').textContent = `◈ ${p.coins}`;
+  $('#streakChip').textContent = `⚡ ${p.streak}`;
+  $('#hpName').innerHTML = `${p.name} · HP <b id="hpNum">${p.hp}/${p.maxHp}</b>`;
+  const pct = p.hp/p.maxHp*100;
+  $('#hpFill').style.width = pct+'%';
+  $('#ekg').classList.toggle('low', pct <= 30);
+  $('#xpFill').style.width = (p.xp/p.xpNext*100)+'%';
+  $('#xpLine').textContent = `XP ${p.xp} / ${p.xpNext}`;
+}
+
+function castSpell(color, onArrive){
+  if(REDUCED){ onArrive(); return; }
+  const from=$('#pav').getBoundingClientRect(), to=$('#enemy').getBoundingClientRect();
+  const bolt=document.createElement('div'); bolt.className='bolt';
+  bolt.style.color = colorVal(color);
+  const x0=from.left+from.width/2, y0=from.top+from.height/2;
+  const x1=to.left+to.width/2,   y1=to.top+to.height/2;
+  bolt.style.left=x0+'px'; bolt.style.top=y0+'px'; bolt.style.transform='translate(-50%,-50%)';
+  document.body.appendChild(bolt);
+  SFX.cast();
+  requestAnimationFrame(()=>{
+    bolt.style.transition='transform .32s cubic-bezier(.5,0,.9,.6), opacity .1s';
+    bolt.style.transform=`translate(-50%,-50%) translate(${x1-x0}px,${y1-y0}px) scale(1.4)`;
+  });
+  setTimeout(()=>{ bolt.remove(); onArrive(); }, 330);
+}
+function hitEnemy(){ const e=$('#enemy'); e.classList.add('hit','flash'); setTimeout(()=>e.classList.remove('flash'),120); setTimeout(()=>e.classList.remove('hit'),340); }
+function hurtPlayer(){ if(REDUCED) return; document.body.classList.add('hurt','shake'); setTimeout(()=>document.body.classList.remove('hurt','shake'),360); }
+function floatNum(anchorEl, text, color, size){
+  const r=anchorEl.getBoundingClientRect();
+  const d=document.createElement('div'); d.className='float'; d.textContent=text;
+  d.style.left=(r.left+r.width/2)+'px'; d.style.top=(r.top+r.height*0.3)+'px';
+  d.style.color=colorVal(color); d.style.fontSize=size+'px';
+  document.body.appendChild(d); setTimeout(()=>d.remove(),1000);
+}
+function colorVal(c){ // resolve a var(--x) to a real color for dynamically-created nodes
+  if(c && c.startsWith('var(')){ const name=c.slice(4,-1).trim();
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#fff'; }
+  return c;
+}
+
+/* keyboard: A–D to answer, Enter to continue */
+document.addEventListener('keydown', e=>{
+  if($('#battle').classList.contains('hidden')) return;
+  const map={a:0,b:1,c:2,d:3};
+  const k=e.key?.toLowerCase();
+  if(map[k]!==undefined && !S.answering){ const b=document.querySelectorAll('.choice')[map[k]]; if(b) b.click(); }
+  if((e.key==='Enter'||e.key===' ') && $('#nextRow').classList.contains('show')){ e.preventDefault(); $('#nextBtn').click(); }
+});
+
+buildRoster();
+
+/* =====================================================================
+   ROADMAP HOOKS for Claude Code (build these next, in your repo):
+   - CHARACTER CUSTOMIZATION: expand CHARACTERS + a creator screen
+     (skin/hair/outfit swaps) → the "Gacha Life" character-maker feel.
+   - COLLECTION / GACHA: spend `coins` to summon cosmetics or ally
+     characters. Use ORIGINAL or licensed art — not copyrighted anime.
+   - WORLD MAP / QUESTS: replace the linear enemy list with a map of
+     nodes; each node = a battle on a specific chapter (Story Mode).
+   - INFINITE QUESTIONS: generate the bank from the Claude API per chapter.
+   - MULTIPLAYER: the hard one — real players need a backend + accounts +
+     networking. Do it LAST, after the single-player loop is fun.
+   ===================================================================== */
+</script>
+</body>
+</html>
