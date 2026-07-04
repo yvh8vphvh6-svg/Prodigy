@@ -440,7 +440,7 @@ function checkUnlocks(){
 }
 function showToast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.remove('go'); void t.offsetWidth; t.classList.add('go'); }
 
-const ENEMIES = ["Pop-Quiz Gremlin","The Cram Wraith","Clinical-Skills Ogre","Pharm Hydra","Anatomy Behemoth","Final Boss: The Proctor"];
+const ENEMIES = ["Pop-Quiz Gremlin","The Cram Golem","Clinical-Skills Ogre","Pharm Hydra","Anatomy Behemoth","Final Boss: The Proctor"];
 const ENEMY_COLORS = ["#ff6b3d","#c04bd6","#4b8bff","#e0b83a","#4be089","#ff3d5e"];
 
 /* =====================================================================
@@ -550,24 +550,94 @@ function startBattle(){
   S.player.streak = Math.floor(S.player.streak/2); // don't carry a full streak into a fresh fight
   S.enemy = makeEnemy(S.enemyIndex);
   const en = $('#enemy');
-  en.innerHTML = enemySVG(S.enemy.color);
+  en.innerHTML = enemySVG(S.enemy.color, S.enemy.tier-1);
   $('#enemyName').textContent = S.enemy.name;
   $('#enemyLvl').textContent = `TIER ${S.enemy.tier} · HP ${S.enemy.maxHp}`;
   renderPlayer(); renderEnemyHp();
   loadQuestion();
 }
 
-function enemySVG(color){
-  // original creature (no copyrighted characters) — a floating study-wraith
+/* enemy art — original creatures (no copyrighted characters), one look per
+   tier so enemies read differently as you climb. SWAPPABLE: each entry is a
+   function (color) => SVG body string drawn in a 0 0 120 120 viewBox; replace
+   any entry (or append more) and the dispatcher below picks it up. Tiers past
+   the end of the array reuse the last look (matches the repeating boss name).
+   Shared palette: body fill url(#eg) tier-color gradient · dark #0b0e16 ·
+   bone/teeth #dfe8f4 · glowing accents ${color}. */
+const ENEMY_ART = [
+  /* tier 1 — Pop-Quiz Gremlin: small horned imp, toothy grin */
+  color=>`
+    <path d="M30 44 L12 12 L48 30 Z" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <path d="M90 44 L108 12 L72 30 Z" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <ellipse cx="60" cy="70" rx="37" ry="35" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <path d="M36 52 L54 58" stroke="#0b0e16" stroke-width="4" stroke-linecap="round"/>
+    <path d="M84 52 L66 58" stroke="#0b0e16" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="46" cy="64" r="6" fill="#0b0e16"/><circle cx="74" cy="64" r="6" fill="#0b0e16"/>
+    <circle cx="48" cy="62" r="2.2" fill="${color}"/><circle cx="76" cy="62" r="2.2" fill="${color}"/>
+    <path d="M40 82 Q60 96 80 82" fill="none" stroke="#0b0e16" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M48 84 l5 8 5-8 Z" fill="#dfe8f4"/><path d="M62 85 l5 8 5-8 Z" fill="#dfe8f4"/>`,
+  /* tier 2 — The Cram Golem: a stack of possessed textbooks, eyes in the gap */
+  color=>`
+    <rect x="24" y="82" width="72" height="20" rx="4" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <path d="M28 88 h10 M82 88 h10" stroke="#dfe8f4" stroke-width="2" opacity=".5"/>
+    <rect x="20" y="60" width="80" height="22" rx="4" fill="#0b0e16"/>
+    <circle cx="47" cy="71" r="4.5" fill="${color}"/><circle cx="73" cy="71" r="4.5" fill="${color}"/>
+    <rect x="26" y="38" width="68" height="22" rx="4" fill="url(#eg)" stroke="#00000055" stroke-width="1.5" transform="rotate(-3 60 49)"/>
+    <path d="M32 45 h12 M76 45 h12" stroke="#dfe8f4" stroke-width="2" opacity=".5" transform="rotate(-3 60 49)"/>
+    <rect x="34" y="20" width="52" height="18" rx="4" fill="url(#eg)" stroke="#00000055" stroke-width="1.5" transform="rotate(4 60 29)"/>`,
+  /* tier 3 — Clinical-Skills Ogre: heavy brow, upturned tusks */
+  color=>`
+    <circle cx="26" cy="74" r="12" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <circle cx="94" cy="74" r="12" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <path d="M28 110 C18 74 26 38 60 34 C94 38 102 74 92 110 Z" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <path d="M38 56 Q60 48 82 56" fill="none" stroke="#0b0e16" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="48" cy="64" r="4.5" fill="#0b0e16"/><circle cx="72" cy="64" r="4.5" fill="#0b0e16"/>
+    <circle cx="49" cy="63" r="1.8" fill="${color}"/><circle cx="73" cy="63" r="1.8" fill="${color}"/>
+    <path d="M42 86 Q60 94 78 86" fill="none" stroke="#0b0e16" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M46 88 L42 72 L54 84 Z" fill="#dfe8f4"/><path d="M74 88 L78 72 L66 84 Z" fill="#dfe8f4"/>`,
+  /* tier 4 — Pharm Hydra: three snake heads, flicking tongues */
+  color=>`
+    <path d="M44 98 C28 72 24 56 34 38" fill="none" stroke="url(#eg)" stroke-width="11" stroke-linecap="round"/>
+    <path d="M60 96 C60 68 60 52 60 30" fill="none" stroke="url(#eg)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M76 98 C92 72 96 56 86 38" fill="none" stroke="url(#eg)" stroke-width="11" stroke-linecap="round"/>
+    <ellipse cx="60" cy="100" rx="36" ry="15" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <ellipse cx="32" cy="38" rx="12" ry="10" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <ellipse cx="60" cy="28" rx="13" ry="11" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <ellipse cx="88" cy="38" rx="12" ry="10" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <circle cx="29" cy="36" r="2.6" fill="#0b0e16"/><circle cx="57" cy="26" r="2.8" fill="#0b0e16"/><circle cx="91" cy="36" r="2.6" fill="#0b0e16"/>
+    <path d="M21 41 l-8 2 M21 41 l-7 5" stroke="${color}" stroke-width="2" stroke-linecap="round"/>
+    <path d="M48 31 l-8 2 M48 31 l-7 5" stroke="${color}" stroke-width="2" stroke-linecap="round"/>
+    <path d="M99 41 l8 2 M99 41 l7 5" stroke="${color}" stroke-width="2" stroke-linecap="round"/>`,
+  /* tier 5 — Anatomy Behemoth: ram horns, four eyes, jagged teeth */
+  color=>`
+    <path d="M34 34 C18 28 10 14 18 4 C22 18 32 24 44 26 Z" fill="#dfe8f4" stroke="#00000055" stroke-width="1.5"/>
+    <path d="M86 34 C102 28 110 14 102 4 C98 18 88 24 76 26 Z" fill="#dfe8f4" stroke="#00000055" stroke-width="1.5"/>
+    <path d="M60 18 C92 18 102 46 98 74 C94 98 80 112 60 112 C40 112 26 98 22 74 C18 46 28 18 60 18 Z" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <path d="M30 52 Q60 40 90 52" fill="none" stroke="#0b0e16" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="42" cy="62" r="6" fill="#0b0e16"/><circle cx="78" cy="62" r="6" fill="#0b0e16"/>
+    <circle cx="44" cy="60" r="2.4" fill="${color}"/><circle cx="80" cy="60" r="2.4" fill="${color}"/>
+    <circle cx="55" cy="73" r="2.6" fill="#0b0e16"/><circle cx="65" cy="73" r="2.6" fill="#0b0e16"/>
+    <path d="M40 92 Q60 100 80 92" fill="none" stroke="#0b0e16" stroke-width="4" stroke-linecap="round"/>
+    <path d="M46 93 l4 7 4-7 Z M58 96 l4 7 4-7 Z M70 93 l4 7 4-7 Z" fill="#dfe8f4"/>`,
+  /* tier 6+ — Final Boss: The Proctor: a stern owl in spectacles + mortarboard */
+  color=>`
+    <path d="M60 24 C86 24 98 48 96 78 C94 102 78 114 60 114 C42 114 26 102 24 78 C22 48 34 24 60 24 Z" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
+    <path d="M42 88 q6 6 12 0 q6 6 12 0 q6 6 12 0" fill="none" stroke="#0b0e16" stroke-width="2" opacity=".55"/>
+    <circle cx="45" cy="58" r="12" fill="#0b0e16" stroke="#dfe8f4" stroke-width="2.5"/>
+    <circle cx="75" cy="58" r="12" fill="#0b0e16" stroke="#dfe8f4" stroke-width="2.5"/>
+    <path d="M57 58 h6" stroke="#dfe8f4" stroke-width="2.5"/>
+    <circle cx="47" cy="56" r="3.5" fill="${color}"/><circle cx="77" cy="56" r="3.5" fill="${color}"/>
+    <path d="M60 68 L53 76 L60 86 L67 76 Z" fill="#0b0e16"/>
+    <path d="M60 10 L100 21 L60 32 L20 21 Z" fill="#0b0e16" stroke="#37496b" stroke-width="1.5"/>
+    <path d="M60 21 L86 28" stroke="#37496b" stroke-width="2"/><circle cx="86" cy="32" r="3.5" fill="${color}"/>`,
+];
+
+function enemySVG(color, tierIndex){
+  const draw = ENEMY_ART[Math.min(tierIndex, ENEMY_ART.length-1)];
   return `<svg viewBox="0 0 120 120" role="img" aria-label="enemy">
     <defs><radialGradient id="eg" cx="45%" cy="35%" r="70%">
       <stop offset="0%" stop-color="${color}"/><stop offset="100%" stop-color="#10131f"/></radialGradient></defs>
-    <path d="M60 12 C88 12 104 34 104 62 C104 84 96 104 88 108 C84 98 78 98 74 108
-             C70 100 64 100 60 108 C56 100 50 100 46 108 C42 98 36 98 32 108
-             C24 104 16 84 16 62 C16 34 32 12 60 12 Z" fill="url(#eg)" stroke="#00000055" stroke-width="1.5"/>
-    <circle cx="46" cy="54" r="8" fill="#0b0e16"/><circle cx="74" cy="54" r="8" fill="#0b0e16"/>
-    <circle cx="48" cy="52" r="3" fill="${color}"/><circle cx="76" cy="52" r="3" fill="${color}"/>
-    <path d="M44 78 Q60 88 76 78" fill="none" stroke="#0b0e16" stroke-width="3" stroke-linecap="round"/>
+    ${draw(color)}
   </svg>`;
 }
 
