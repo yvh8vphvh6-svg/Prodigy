@@ -426,6 +426,62 @@
   .pdflesson .pdfdel{ font-family:var(--mono); font-size:12px; color:var(--dim); padding:2px 8px; border-radius:6px; flex:none; }
   .pdflesson .pdfdel:hover{ color:var(--hplow); }
 
+  /* ---------- study maker (Phase 2): questions + flashcards from highlights ---------- */
+  .hlmake{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .mk{ font-family:var(--mono); font-size:10.5px; letter-spacing:.04em; color:var(--muted);
+    background:rgba(255,255,255,.03); border:1px solid var(--glass-brd); border-radius:7px; padding:3px 9px; cursor:pointer;
+    transition:border-color .18s, color .18s; }
+  .mk:hover{ border-color:var(--reagent); color:var(--text); }
+  .mkbadge{ font-family:var(--mono); font-size:10px; color:var(--gold); border:1px solid #6a5a20; border-radius:6px; padding:2px 6px; }
+  /* study summary bar in the reader sidebar */
+  .studybar{ display:flex; flex-direction:column; gap:7px; border:1px solid var(--glass-brd); border-radius:12px;
+    padding:10px 11px; background:rgba(255,255,255,.02); }
+  .studybar .sbrow{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .studybar .sbcount{ font-family:var(--mono); font-size:11.5px; color:var(--text); letter-spacing:.03em; }
+  .studybar .sbbtn{ padding:6px 12px; font-size:10.5px; }
+  .studybar .sbnote{ font-size:11px; line-height:1.5; color:var(--dim); }
+  .studybar .sbnote b{ color:var(--muted); font-weight:400; }
+  /* modal overlay shared by the maker + the flashcard deck */
+  .mkoverlay{ position:fixed; inset:0; z-index:85; display:flex; align-items:center; justify-content:center; padding:20px;
+    background:rgba(6,10,18,.72); -webkit-backdrop-filter:blur(12px) saturate(1.2); backdrop-filter:blur(12px) saturate(1.2);
+    animation:screenIn .3s var(--ease-out) both; }
+  .mkbox{ width:min(560px,100%); max-height:90vh; overflow:auto;
+    background:var(--panel); border:1px solid var(--glass-brd2); border-radius:18px; padding:20px 22px; box-shadow:var(--shadow);
+    display:flex; flex-direction:column; gap:9px; }
+  .mkhead{ font-size:19px; font-weight:800; letter-spacing:-.01em; display:flex; align-items:center; }
+  .mkclose{ margin-left:auto; cursor:pointer; color:var(--muted); font-size:16px; }
+  .mkclose:hover{ color:var(--text); }
+  .mkctx{ font-size:12.5px; line-height:1.5; color:var(--reagent); background:rgba(47,224,168,.08);
+    border-left:2px solid var(--reagent); border-radius:0 8px 8px 0; padding:8px 11px; }
+  .mklab{ font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-top:6px; }
+  .mkin{ width:100%; background:rgba(10,15,24,.6); color:var(--text); border:1px solid var(--glass-brd); border-radius:10px;
+    padding:9px 11px; font-family:var(--ui); font-size:14px; line-height:1.5; resize:vertical; }
+  .mkin:focus{ outline:none; border-color:var(--reagent); box-shadow:0 0 0 1px rgba(47,224,168,.4); }
+  select.mkin{ cursor:pointer; }
+  .mkchoice{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .mkradio{ flex:none; width:30px; height:30px; border-radius:50%; border:1px solid var(--glass-brd2);
+    background:rgba(255,255,255,.03); color:var(--reagent); font-size:15px; cursor:pointer; line-height:1; }
+  .mkradio:hover{ border-color:var(--reagent); }
+  .mktagrow{ display:flex; gap:10px; flex-wrap:wrap; }
+  .mktagrow > div:first-child{ min-width:130px; }
+  .mkerr{ font-family:var(--mono); font-size:11px; color:var(--hplow); min-height:14px; }
+  .mkactions{ display:flex; gap:10px; margin-top:6px; }
+  /* flashcard deck review */
+  .deckwrap{ width:min(600px,100%); display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .deckbar{ width:100%; display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:12px; color:var(--muted); }
+  .deckbar .grow{ flex:1; }
+  .deckbar .btn{ padding:7px 12px; font-size:10.5px; }
+  .deckcard{ position:relative; width:min(560px,92vw); height:min(340px,52vh); cursor:pointer;
+    transform-style:preserve-3d; transition:transform .5s var(--ease); }
+  .deckcard.flipped{ transform:rotateY(180deg); }
+  .deckface{ position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden;
+    display:grid; place-items:center; text-align:center; padding:26px; border-radius:18px; overflow:auto;
+    font-size:clamp(16px,2.6vw,22px); line-height:1.5; box-shadow:var(--shadow);
+    background:var(--glass); border:1px solid var(--glass-brd2); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); }
+  .deckback{ transform:rotateY(180deg); color:var(--reagent); }
+  .deckhint{ font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+  .decknav{ display:flex; gap:10px; }
+
   @media (prefers-reduced-motion: reduce){
     *{ animation:none !important; transition:none !important; }
     body::after{ display:none; }        /* drop the animated background glow */
@@ -582,6 +638,7 @@
             <textarea id="pdfNote" placeholder="Notes about this whole document…"></textarea>
             <span class="saved" id="pdfNoteSaved">✓ saved</span>
           </div>
+          <div class="studybar" id="studyBar"></div>
           <div class="pdfhls">
             <div class="hlhead"><span>highlights</span><div class="hlfilter" id="hlFilter"></div></div>
             <div class="hllist" id="hlList"></div>
@@ -627,6 +684,26 @@
 
   <div class="levelup" id="levelup"><span>LEVEL UP</span></div>
   <div class="toast" id="toast">★ CHARACTER UNLOCKED</div>
+
+  <!-- ===== STUDY MAKER + FLASHCARD DECK (Phase 2) ===== -->
+  <div id="maker" class="mkoverlay hidden"><div class="mkbox" id="makerBox"></div></div>
+  <div id="deck" class="mkoverlay hidden">
+    <div class="deckwrap">
+      <div class="deckbar"><span id="deckCount">0 / 0</span><span class="grow"></span>
+        <button class="btn ghost" id="deckDel">🗑 delete</button>
+        <button class="btn ghost" id="deckClose">✕ close</button></div>
+      <div class="deckcard" id="deckCard">
+        <div class="deckface deckfront" id="deckFront"></div>
+        <div class="deckface deckback" id="deckBack"></div>
+      </div>
+      <div class="deckhint" id="deckHint">front — tap to flip</div>
+      <div class="decknav">
+        <button class="btn ghost" id="deckPrev">◂ prev</button>
+        <button class="btn primary" id="deckFlip">flip</button>
+        <button class="btn ghost" id="deckNext">next ▸</button>
+      </div>
+    </div>
+  </div>
   <div class="soundnote">🔊 sound on for spell &amp; hit effects</div>
 
 <script>
@@ -911,11 +988,13 @@ const CHARACTERS = [
 const SAVE_KEY = "clinicalQuestSave";
 function loadMeta(){
   const fresh = { unlocked:[], lastChar:null, notes:{}, lessonsDone:[], concepts:{},
+                  userQuestions:[], userCards:[],
                   progress:{corrects:0, wins:0, bestStreak:0, bestTier:0, bestLevel:1} };
   try{
     const m = JSON.parse(localStorage.getItem(SAVE_KEY)) || {};
     return { unlocked:m.unlocked||[], lastChar:m.lastChar||null,
              notes:m.notes||{}, lessonsDone:m.lessonsDone||[], concepts:m.concepts||{},
+             userQuestions:m.userQuestions||[], userCards:m.userCards||[],
              progress:Object.assign(fresh.progress, m.progress) };
   }catch(e){ return fresh; }
 }
@@ -996,7 +1075,8 @@ const TIME_PER_Q = 18;
 
 function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; }
 function refillQueue(){
-  const pool = subjectSel==="All" ? QUESTION_BANK : QUESTION_BANK.filter(q=>q.subject===subjectSel);
+  const bank = QUESTION_BANK.concat(userQuestionBank()); // Phase 2: your PDF questions join the pool
+  const pool = subjectSel==="All" ? bank : bank.filter(q=>q.subject===subjectSel);
   S.queue = shuffle(pool); S.qi = 0;
 }
 function currentQ(){ if(S.qi>=S.queue.length) refillQueue(); return S.queue[S.qi]; }
@@ -1900,9 +1980,12 @@ async function addPdfFile(file){
   showLessonList();
 }
 async function removePdf(id){
-  if(!confirm('Remove this PDF and all of its highlights?')) return false;
+  if(!confirm('Remove this PDF and all of its highlights, questions, and flashcards?')) return false;
   try{ const hls = await PDFDB.byIndex('highlights','pdfId',id); for(const h of hls) await PDFDB.del('highlights', h.id); }catch(e){}
   await PDFDB.del('pdfs', id);
+  META.userQuestions = (META.userQuestions||[]).filter(x=>x.pdfId!==id); // Phase 2 cleanup
+  META.userCards     = (META.userCards||[]).filter(x=>x.pdfId!==id);
+  saveMeta();
   showLessonList();
   return true;
 }
@@ -2062,9 +2145,10 @@ function refreshSidebar(){
   const shown = PDF.highlights
     .filter(h=>PDF.filter==='all'||h.color===PDF.filter)
     .sort((a,b)=> a.page-b.page || ((a.rects[0]&&a.rects[0].y)||0)-((b.rects[0]&&b.rects[0].y)||0));
-  if(!shown.length){ list.innerHTML=`<p class="hlempty">No highlights yet. Select text in the PDF, then pick a color.</p>`; return; }
+  if(!shown.length){ list.innerHTML=`<p class="hlempty">No highlights yet. Select text in the PDF, then pick a color.</p>`; refreshStudyBar(); return; }
   shown.forEach(h=>{
     const el=document.createElement('div'); el.className='hlitem';
+    const nq=studyCountFor(h.id,'q'), nf=studyCountFor(h.id,'f');
     el.innerHTML = `<div class="hlrow">
         <span class="hldot" style="background:${colorFor(h.color)}"></span>
         <span class="hlpage">p.${h.page} · ${escapeHtml((HL_COLORS.find(c=>c.key===h.color)||{}).label||h.color)}</span>
@@ -2072,14 +2156,23 @@ function refreshSidebar(){
         <button class="hlremove" type="button" title="delete">✕</button>
       </div>
       <div class="hltext">“${escapeHtml((h.text||'').slice(0,160))}”</div>
-      <textarea class="hlnote" placeholder="add a note…">${escapeHtml(h.note||'')}</textarea>`;
+      <textarea class="hlnote" placeholder="add a note…">${escapeHtml(h.note||'')}</textarea>
+      <div class="hlmake">
+        <button class="mk mkq" type="button">＋ question</button>
+        <button class="mk mkf" type="button">＋ flashcard</button>
+        ${nq?`<span class="mkbadge" title="questions from this highlight">Q·${nq}</span>`:''}
+        ${nf?`<span class="mkbadge" title="flashcards from this highlight">F·${nf}</span>`:''}
+      </div>`;
     el.querySelector('.hljump').addEventListener('click', ()=>jumpToHighlight(h));
     el.querySelector('.hlremove').addEventListener('click', ()=>deleteHighlight(h));
+    el.querySelector('.mkq').addEventListener('click', ()=>openQuestionMaker(h));
+    el.querySelector('.mkf').addEventListener('click', ()=>openCardMaker(h));
     const ta=el.querySelector('.hlnote');
     ta.addEventListener('input', ()=>{ h.note=ta.value; clearTimeout(h._t);
       h._t=setTimeout(()=>PDFDB.put('highlights', hlClean(h)), 400); });
     list.appendChild(el);
   });
+  refreshStudyBar();
 }
 
 /* ---- floating color picker over a fresh selection ---- */
@@ -2109,8 +2202,10 @@ function hideHlPop(){ $('#hlPop').classList.add('hidden'); PDF.pending=null; }
 function exportPdfJson(){
   const rec=PDF.record; if(!rec) return;
   const data = {
-    pdf:{ id:rec.id, name:rec.name, addedAt:rec.addedAt, note:rec.note||'' },
+    pdf:{ id:rec.id, name:rec.name, addedAt:rec.addedAt, note:rec.note||'', subject:rec.subject||null, chapter:rec.chapter||null },
     highlights: PDF.highlights.map(hlClean),
+    questions: pdfQuestions(rec.id),   // Phase 2: study content made from this PDF
+    flashcards: pdfCards(rec.id),
     exportedAt: new Date().toISOString(),
   };
   const blob=new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
@@ -2156,6 +2251,197 @@ document.addEventListener('mousedown', e=>{
     for(const f of files) await addPdfFile(f);
   });
 })();
+
+/* =====================================================================
+   9) STUDY MAKER (Phase 2) — turn a PDF highlight into study content:
+   a multiple-choice QUESTION (flows into Cram + Battle via the subject
+   filter) or a FLASHCARD (reviewed in a flip-card deck). All manual —
+   no Claude API. Saved to META (localStorage). Each item remembers the
+   PDF + highlight it came from, plus a subject + chapter tag that sticks
+   to the PDF. HOOK: a later phase can auto-draft these from the text.
+   ===================================================================== */
+const SUBJECTS = [...new Set(QUESTION_BANK.map(q=>q.subject))];
+const MK = { type:null, hl:null, answer:0 };
+
+/* your PDF questions, mapped into the QUESTION_BANK shape for battle/cram */
+function userQuestionBank(){
+  return (META.userQuestions||[]).map(u=>({ subject:u.subject, chapter:u.chapter||'My cards',
+    q:u.q, choices:u.choices, answer:u.answer, why:u.why||'', _user:true }));
+}
+function studyCountFor(hlId, type){
+  const arr = type==='q' ? META.userQuestions : META.userCards;
+  return (arr||[]).filter(x=>x.hlId===hlId).length;
+}
+function pdfQuestions(pdfId){ return (META.userQuestions||[]).filter(x=>x.pdfId===pdfId); }
+function pdfCards(pdfId){ return (META.userCards||[]).filter(x=>x.pdfId===pdfId); }
+
+/* the subject/chapter tag lives on the PDF record so it's pre-filled next time */
+function pdfTag(){ const r=PDF.record||{}; return { subject:r.subject||SUBJECTS[0]||'A&P', chapter:r.chapter||'' }; }
+function rememberPdfTag(subject, chapter){
+  if(!PDF.record) return;
+  PDF.record.subject=subject; PDF.record.chapter=chapter;
+  PDFDB.put('pdfs', PDF.record);
+}
+function subjectSelectHtml(sel){
+  return `<select id="mkSubject" class="mkin">${SUBJECTS.map(s=>`<option${s===sel?' selected':''}>${escapeHtml(s)}</option>`).join('')}</select>`;
+}
+
+/* ---- shared modal open/close ---- */
+function openMaker(){
+  $('#maker').classList.remove('hidden');
+  const c=$('#mkClose'); if(c) c.onclick=closeMaker;
+  const cc=$('#mkCancel'); if(cc) cc.onclick=closeMaker;
+  document.addEventListener('keydown', makerEsc);
+}
+function closeMaker(){ $('#maker').classList.add('hidden'); document.removeEventListener('keydown', makerEsc); MK.hl=null; }
+function makerEsc(e){ if(e.key==='Escape') closeMaker(); }
+
+/* ---- QUESTION maker ---- */
+function openQuestionMaker(hl){
+  MK.type='q'; MK.hl=hl; MK.answer=0;
+  const tag=pdfTag();
+  $('#makerBox').innerHTML = `
+    <div class="mkhead">Make a question <span class="mkclose" id="mkClose">✕</span></div>
+    <div class="mkctx">from highlight: “${escapeHtml((hl.text||'').slice(0,220))}”</div>
+    <label class="mklab">Question</label>
+    <textarea id="mkQ" class="mkin" rows="2" placeholder="Ask something the passage answers…"></textarea>
+    <label class="mklab">Choices — tap ◯ to mark the correct one</label>
+    <div id="mkChoices"></div>
+    <label class="mklab">Rationale (one line)</label>
+    <input id="mkWhy" class="mkin" placeholder="Why the correct answer is right"/>
+    <div class="mktagrow">
+      <div><label class="mklab">Subject</label>${subjectSelectHtml(tag.subject)}</div>
+      <div style="flex:1; min-width:150px"><label class="mklab">Chapter / topic</label>
+        <input id="mkChapter" class="mkin" value="${escapeHtml(tag.chapter)}" placeholder="e.g. Cardiovascular"/></div>
+    </div>
+    <div class="mkerr" id="mkErr"></div>
+    <div class="mkactions">
+      <button class="btn primary" id="mkSave" type="button">save question</button>
+      <button class="btn ghost" id="mkCancel" type="button">cancel</button>
+    </div>`;
+  const cw=$('#mkChoices');
+  for(let i=0;i<4;i++){
+    const row=document.createElement('div'); row.className='mkchoice';
+    row.innerHTML=`<button type="button" class="mkradio" data-i="${i}" title="mark correct">${i===0?'●':'◯'}</button>
+      <input class="mkin mkchoiceinput" data-i="${i}" placeholder="Choice ${String.fromCharCode(65+i)}"/>`;
+    cw.appendChild(row);
+  }
+  cw.querySelectorAll('.mkradio').forEach(r=>r.addEventListener('click', ()=>{
+    MK.answer=+r.dataset.i;
+    cw.querySelectorAll('.mkradio').forEach(x=>x.textContent = (+x.dataset.i===MK.answer)?'●':'◯');
+  }));
+  openMaker();
+  $('#mkSave').addEventListener('click', saveQuestion);
+  $('#mkQ').focus();
+}
+function saveQuestion(){
+  const q=$('#mkQ').value.trim();
+  const choices=[...document.querySelectorAll('.mkchoiceinput')].map(i=>i.value.trim());
+  const why=$('#mkWhy').value.trim();
+  const subject=$('#mkSubject').value;
+  const chapter=$('#mkChapter').value.trim()||'My cards';
+  const err=$('#mkErr');
+  if(!q){ err.textContent='Add a question.'; return; }
+  if(choices.filter(Boolean).length<2){ err.textContent='Add at least two choices.'; return; }
+  if(!choices[MK.answer]){ err.textContent='The choice you marked correct is empty.'; return; }
+  const clean = choices.filter(Boolean);
+  const answerIdx = clean.indexOf(choices[MK.answer]); // re-index after dropping blanks
+  META.userQuestions.push({ id:uid('uq-'), pdfId:PDF.id, hlId:MK.hl.id, subject, chapter,
+    q, choices:clean, answer:answerIdx<0?0:answerIdx, why, createdAt:Date.now() });
+  saveMeta(); rememberPdfTag(subject, chapter);
+  closeMaker(); refreshSidebar();
+  showToast('✓ question saved — it now plays in Cram &amp; Battle');
+}
+
+/* ---- FLASHCARD maker ---- */
+function openCardMaker(hl){
+  MK.type='f'; MK.hl=hl;
+  $('#makerBox').innerHTML = `
+    <div class="mkhead">Make a flashcard <span class="mkclose" id="mkClose">✕</span></div>
+    <div class="mkctx">from highlight: “${escapeHtml((hl.text||'').slice(0,220))}”</div>
+    <label class="mklab">Front — your prompt</label>
+    <textarea id="mkFront" class="mkin" rows="2" placeholder="What should this card ask you?"></textarea>
+    <label class="mklab">Back — the answer or passage</label>
+    <textarea id="mkBack" class="mkin" rows="5">${escapeHtml(hl.text||'')}</textarea>
+    <div class="mkerr" id="mkErr"></div>
+    <div class="mkactions">
+      <button class="btn primary" id="mkSave" type="button">save flashcard</button>
+      <button class="btn ghost" id="mkCancel" type="button">cancel</button>
+    </div>`;
+  openMaker();
+  $('#mkSave').addEventListener('click', saveCard);
+  $('#mkFront').focus();
+}
+function saveCard(){
+  const front=$('#mkFront').value.trim();
+  const back=$('#mkBack').value.trim();
+  const err=$('#mkErr');
+  if(!front){ err.textContent='Add a front (your prompt).'; return; }
+  if(!back){ err.textContent='Add a back (answer or passage).'; return; }
+  META.userCards.push({ id:uid('uc-'), pdfId:PDF.id, hlId:MK.hl.id, front, back, createdAt:Date.now() });
+  saveMeta(); closeMaker(); refreshSidebar();
+  showToast('✓ flashcard saved');
+}
+
+/* ---- study summary in the reader sidebar ---- */
+function refreshStudyBar(){
+  const bar=$('#studyBar'); if(!bar || !PDF.id) return;
+  const nq=pdfQuestions(PDF.id).length, nf=pdfCards(PDF.id).length;
+  bar.innerHTML = `
+    <div class="sbrow">
+      <span class="sbcount">🧠 ${nq} question${nq!==1?'s':''}</span>
+      <span class="sbcount">🃏 ${nf} flashcard${nf!==1?'s':''}</span>
+    </div>
+    <div class="sbrow">
+      <button class="btn ghost sbbtn" id="sbDeck" type="button"${nf?'':' disabled'}>review flashcards ▸</button>
+    </div>
+    ${nq?`<div class="sbnote">Your questions are mixed into <b>Cram</b> &amp; <b>Battle</b> under their subject tab.</div>`:''}`;
+  const d=$('#sbDeck'); if(d && nf) d.addEventListener('click', ()=>openDeck('pdf'));
+}
+
+/* ---- flashcard review: flip-card deck ---- */
+const DECK = { cards:[], i:0, flipped:false };
+function openDeck(scope){
+  DECK.cards = scope==='all' ? (META.userCards||[]).slice() : pdfCards(PDF.id);
+  if(!DECK.cards.length){ showToast('No flashcards yet — make one from a highlight'); return; }
+  DECK.i=0; DECK.flipped=false;
+  $('#deck').classList.remove('hidden');
+  renderDeck();
+  document.addEventListener('keydown', deckKeys);
+}
+function renderDeck(){
+  const c=DECK.cards[DECK.i]; if(!c){ closeDeck(); return; }
+  $('#deckCount').textContent = `${DECK.i+1} / ${DECK.cards.length}`;
+  $('#deckCard').className = 'deckcard'+(DECK.flipped?' flipped':'');
+  $('#deckFront').textContent = c.front;
+  $('#deckBack').textContent = c.back;
+  $('#deckHint').textContent = DECK.flipped ? 'back — tap to see front' : 'front — tap to flip';
+}
+function deckFlip(){ DECK.flipped=!DECK.flipped; renderDeck(); }
+function deckMove(d){ if(!DECK.cards.length) return; DECK.i=(DECK.i+d+DECK.cards.length)%DECK.cards.length; DECK.flipped=false; renderDeck(); }
+function deckDelete(){
+  const c=DECK.cards[DECK.i]; if(!c) return;
+  META.userCards=(META.userCards||[]).filter(x=>x.id!==c.id); saveMeta();
+  DECK.cards.splice(DECK.i,1); refreshSidebar();
+  if(!DECK.cards.length){ closeDeck(); return; }
+  if(DECK.i>=DECK.cards.length) DECK.i=0; DECK.flipped=false; renderDeck();
+}
+function closeDeck(){ $('#deck').classList.add('hidden'); document.removeEventListener('keydown', deckKeys); }
+function deckKeys(e){
+  if(e.key==='Escape'){ closeDeck(); return; }
+  if(e.key===' '||e.key==='Enter'){ e.preventDefault(); deckFlip(); }
+  else if(e.key==='ArrowRight') deckMove(1);
+  else if(e.key==='ArrowLeft') deckMove(-1);
+}
+/* deck wiring */
+$('#deckCard').addEventListener('click', deckFlip);
+$('#deckFlip').addEventListener('click', deckFlip);
+$('#deckNext').addEventListener('click', ()=>deckMove(1));
+$('#deckPrev').addEventListener('click', ()=>deckMove(-1));
+$('#deckDel').addEventListener('click', deckDelete);
+$('#deckClose').addEventListener('click', closeDeck);
+$('#maker').addEventListener('mousedown', e=>{ if(e.target.id==='maker') closeMaker(); });
+$('#deck').addEventListener('mousedown', e=>{ if(e.target.id==='deck') closeDeck(); });
 
 /* =====================================================================
    ROADMAP HOOKS for Claude Code (build these next, in your repo):
