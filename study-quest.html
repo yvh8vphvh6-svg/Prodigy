@@ -214,7 +214,7 @@
   .notepane .saved.show{ opacity:1; }
 
   /* ---------- mind map ---------- */
-  #mindmap{ position:relative; overflow:hidden; }
+  #mindmap{ overflow:hidden; } /* stays position:fixed inset:0 from .screen — the canvas + bars position against it */
   #mapCanvas{ position:absolute; inset:0; width:100%; height:100%; touch-action:none; cursor:grab; display:block; }
   #mapCanvas:active{ cursor:grabbing; }
   .mapbar{ position:absolute; top:0; left:0; right:0; z-index:2; display:flex; gap:10px; align-items:center;
@@ -655,15 +655,18 @@
     <div class="mapbar">
       <span class="title">🕸 knowledge map</span>
       <span class="spacer"></span>
+      <button class="btn ghost" id="mapExpand">expand all</button>
+      <button class="btn ghost" id="mapCollapse">collapse all</button>
       <button class="btn ghost" id="mapReset">reset layout</button>
       <button class="btn ghost" id="mapQuit">back to select</button>
     </div>
     <div class="maplegend">
+      <div style="margin-bottom:3px"><b>subject ▸ chapter ▸ concept</b></div>
       <div><span class="dot d-un"></span><b>untouched</b></div>
       <div><span class="dot d-read"></span><b>lesson read</b></div>
       <div><span class="dot d-mast"></span><b>quiz passed</b></div>
       <div><span class="dot d-weak"></span><b>needs review</b></div>
-      <div style="margin-top:4px; opacity:.7">drag nodes · scroll to zoom · tap to study</div>
+      <div style="margin-top:4px; opacity:.7">tap a subject/chapter to expand · tap a concept to study · drag · scroll to zoom</div>
     </div>
     <div class="mapzoom">
       <button id="mapZoomIn" aria-label="zoom in">+</button>
@@ -1666,10 +1669,12 @@ $('#libNext').addEventListener('click', nextLibQ);
 $('#libQuit').addEventListener('click', ()=>{ $('#library').classList.add('hidden'); buildRoster(); $('#select').classList.remove('hidden'); });
 
 /* =====================================================================
-   7) MIND MAP — Obsidian-style force-directed knowledge graph on a
-   <canvas>, pure vanilla JS. Nodes = concepts (each has a quiz); edges =
-   hand-wired CONCEPT_LINKS. Node color = subject; node style = mastery
-   (from META.concepts, persisted). Tap a node → its lesson + quiz.
+   7) MIND MAP — force-directed knowledge graph on a <canvas>, pure vanilla
+   JS. Phase 3: a collapsible 3-level TREE — subject ▸ chapter ▸ concept
+   (edges are parent→child; the old flat CONCEPT_LINKS/related graph is no
+   longer used for layout). Node color = subject; concept style = mastery
+   (from META.concepts, persisted). Tap a subject/chapter to expand, tap a
+   concept → its lesson + quiz.
    ===================================================================== */
 const MAP = { built:false, nodes:[], edges:[], scale:1, ox:0, oy:0, alpha:1,
               canvas:null, ctx:null, raf:null, dpr:1, cssW:0, cssH:0,
@@ -1679,26 +1684,100 @@ function subjColor(subject){
   if(!MAP.subjColor[subject]) MAP.subjColor[subject] = colorVal((ELEMENTS[subject]||ELEMENTS["A&P"]).css);
   return MAP.subjColor[subject];
 }
-function buildMap(){
-  if(MAP.built) return; MAP.built = true;
-  const subjects = [...new Set(CONCEPTS.map(c=>c.subject))];
-  const si = {}; subjects.forEach((s,i)=>si[s]=i);
-  const count = {};
-  CONCEPTS.forEach(c=>{
-    const k = (count[c.subject] = (count[c.subject]||0)+1);
-    const base = (si[c.subject]/subjects.length)*Math.PI*2;   // subject sector
-    const ang = base + k*0.55;                                 // spiral within sector
-    const rad = 70 + k*24;
-    c.x = Math.cos(ang)*rad; c.y = Math.sin(ang)*rad; c.vx = 0; c.vy = 0;
-    MAP.nodes.push(c);
+/* ---- Phase 3: hierarchical tree — SUBJECT (L1) ▸ CHAPTER (L2) ▸ CONCEPT (L3).
+   L1 anchored + heavy + always visible; L2 revealed by expanding its subject;
+   L3 revealed by expanding its chapter. Phase-2 user questions are folded in
+   under their (subject, chapter) — merged into an existing concept when one
+   covers that chapter, else a new "yours" concept node with the same mastery
+   tracking. Only visible nodes are simulated + drawn. ---- */
+const TREE = { subjects:[], chapters:[], concepts:[], byId:{}, sig:null };
+const SUBJ_ORDER = ["A&P","Chemistry","Biology","Math"];
+
+function buildTree(){
+  TREE.subjects=[]; TREE.chapters=[]; TREE.concepts=[]; TREE.byId={};
+  // 1) concept sources = built-in CONCEPTS (copy quiz) + Phase-2 user questions
+  const src = CONCEPTS.map(c=>({ id:c.id, title:c.title, subject:c.subject,
+    chapter:c.chapter||c.title, lessonId:c.lessonId||null, quiz:(c.quiz||[]).slice() }));
+  const byChap = {}; src.forEach(c=>{ const k=c.subject+'/'+c.chapter; if(!byChap[k]) byChap[k]=c; });
+  (META.userQuestions||[]).forEach(u=>{
+    const subject=u.subject, chapter=u.chapter||'My cards', k=subject+'/'+chapter;
+    const q={ q:u.q, choices:u.choices, answer:u.answer, why:u.why||'' };
+    if(byChap[k]){ byChap[k].quiz.push(q); }                       // fold into the matching concept
+    else { const c={ id:'user:'+k, title:chapter, subject, chapter, lessonId:null, quiz:[q], _user:true };
+           src.push(c); byChap[k]=c; }                             // else a new "yours" concept
   });
-  const seen = new Set();
-  CONCEPTS.forEach(a=>a.related.forEach(bid=>{
-    const key = [a.id,bid].sort().join('|');
-    if(seen.has(key) || !CONCEPT_BY_ID[bid]) return; seen.add(key);
-    MAP.edges.push([a, CONCEPT_BY_ID[bid]]);
-  }));
+  // 2) subjects present, preferred order first
+  const present=[...new Set(src.map(c=>c.subject))];
+  const subjects=SUBJ_ORDER.filter(s=>present.includes(s)).concat(present.filter(s=>!SUBJ_ORDER.includes(s)));
+  const R = 130 + subjects.length*26;
+  subjects.forEach((s,i)=>{
+    const ang=-Math.PI/2 + i/subjects.length*Math.PI*2;
+    const ax=Math.cos(ang)*R, ay=Math.sin(ang)*R;
+    const nd={ id:'subj:'+s, level:1, title:s, subject:s, parent:null, children:[],
+      x:ax, y:ay, vx:0, vy:0, anchor:{x:ax,y:ay}, expanded:false, shown:true, a:1 };
+    TREE.subjects.push(nd); TREE.byId[nd.id]=nd;
+  });
+  // 3) chapter nodes per (subject,chapter)
+  const chapNode={};
+  src.forEach(c=>{
+    const k=c.subject+'/'+c.chapter;
+    if(chapNode[k]) return;
+    const subj=TREE.byId['subj:'+c.subject];
+    const nd={ id:'chap:'+k, level:2, title:c.chapter, subject:c.subject, parent:subj, children:[],
+      x:subj.x, y:subj.y, vx:0, vy:0, expanded:false, shown:false, a:0 };
+    chapNode[k]=nd; TREE.chapters.push(nd); TREE.byId[nd.id]=nd; subj.children.push(nd);
+  });
+  // 4) concept nodes (level 3) carry lessonId + quiz so openConcept() works unchanged
+  src.forEach(c=>{
+    const chap=chapNode[c.subject+'/'+c.chapter];
+    const nd={ id:c.id, level:3, title:c.title, subject:c.subject, parent:chap, children:[],
+      x:chap.x, y:chap.y, vx:0, vy:0, lessonId:c.lessonId, quiz:c.quiz, shown:false, a:0 };
+    TREE.concepts.push(nd); TREE.byId[nd.id]=nd; chap.children.push(nd);
+  });
+  MAP.nodes = TREE.subjects.concat(TREE.chapters, TREE.concepts);
+  MAP.edges = [];
+  TREE.chapters.forEach(ch=>MAP.edges.push([ch.parent, ch]));
+  TREE.concepts.forEach(co=>MAP.edges.push([co.parent, co]));
+  TREE.sig = (META.userQuestions||[]).length+':'+CONCEPTS.length;
 }
+/* rebuild only when the underlying content changed; preserve expand state + positions */
+function maybeRebuildTree(){
+  const sig=(META.userQuestions||[]).length+':'+CONCEPTS.length;
+  if(TREE.subjects.length && sig===TREE.sig) return;
+  const prevExpanded={}, prevPos={};
+  Object.values(TREE.byId).forEach(n=>{ prevExpanded[n.id]=n.expanded; prevPos[n.id]={x:n.x,y:n.y}; });
+  buildTree();
+  MAP.nodes.forEach(n=>{ if(prevExpanded[n.id]!==undefined) n.expanded=prevExpanded[n.id];
+    if(prevPos[n.id]){ n.x=prevPos[n.id].x; n.y=prevPos[n.id].y; } });
+  updateVisibility();
+}
+function nodeVisible(nd){
+  if(nd.level===1) return true;
+  if(nd.level===2) return !!nd.parent.expanded;
+  return !!(nd.parent.expanded && nd.parent.parent.expanded);
+}
+function updateVisibility(){
+  MAP.nodes.forEach(nd=>{
+    const vis=nodeVisible(nd);
+    if(vis && !nd.shown && nd.a<0.05 && nd.parent){    // newly revealed → spawn near parent
+      const sibs=nd.parent.children, i=Math.max(0,sibs.indexOf(nd));
+      const ang=i/Math.max(1,sibs.length)*Math.PI*2 + nd.level*0.7;
+      const rad=nd.level===2?70:40;
+      nd.x=nd.parent.x+Math.cos(ang)*rad+(Math.random()*8-4);
+      nd.y=nd.parent.y+Math.sin(ang)*rad+(Math.random()*8-4);
+      nd.vx=0; nd.vy=0;
+    }
+    nd.shown=vis;
+  });
+}
+function toggleNode(nd){
+  if(nd.level===1){ nd.expanded=!nd.expanded; if(!nd.expanded) nd.children.forEach(ch=>ch.expanded=false); }
+  else if(nd.level===2){ nd.expanded=!nd.expanded; }
+  updateVisibility(); reheatMap();
+}
+function onTapNode(nd){ if(!nd) return; if(nd.level===3) openConcept(nd); else toggleNode(nd); }
+function collapseAll(){ TREE.subjects.forEach(s=>s.expanded=false); TREE.chapters.forEach(c=>c.expanded=false); updateVisibility(); reheatMap(); }
+function expandAll(){ TREE.subjects.forEach(s=>s.expanded=true); TREE.chapters.forEach(c=>c.expanded=true); updateVisibility(); reheatMap(); }
 function reheatMap(){ MAP.alpha = 1; if(!MAP.raf) MAP.raf = requestAnimationFrame(mapFrame); }
 function resizeMap(){
   const c = MAP.canvas, r = c.getBoundingClientRect();
@@ -1708,7 +1787,7 @@ function resizeMap(){
 }
 function openMap(){
   SFX.init && SFX.init();
-  buildMap();
+  maybeRebuildTree();          // builds on first open; folds in new Phase-2 content
   $('#select').classList.add('hidden');
   $('#mindmap').classList.remove('hidden');
   MAP.canvas = MAP.canvas || $('#mapCanvas');
@@ -1719,72 +1798,111 @@ function openMap(){
 }
 function stopMap(){ if(MAP.raf){ cancelAnimationFrame(MAP.raf); MAP.raf = null; } }
 function resetMapLayout(){
-  MAP.built = false; MAP.nodes = []; MAP.edges = []; buildMap();
+  buildTree();                 // fresh topology + positions (subjects back on their ring)
+  TREE.subjects.forEach(s=>s.expanded=false); TREE.chapters.forEach(c=>c.expanded=false);
+  updateVisibility();
   MAP.scale = 1; MAP.ox = MAP.cssW/2; MAP.oy = MAP.cssH/2; reheatMap();
 }
 
-/* --- physics: repel all pairs, springs on edges, gentle center gravity --- */
+/* --- physics: only VISIBLE nodes; subjects heavy + anchored; springs on tree edges --- */
 function stepMap(){
-  const n = MAP.nodes, a = MAP.alpha;
-  for(let i=0;i<n.length;i++) for(let j=i+1;j<n.length;j++){
-    let dx=n[i].x-n[j].x, dy=n[i].y-n[j].y, d2=dx*dx+dy*dy;
-    if(d2<1){ d2=1; dx=(i-j)||1; } const d=Math.sqrt(d2); if(d>320) continue;
-    const f = 3200/d2, fx=dx/d*f, fy=dy/d*f;
-    n[i].vx+=fx*a; n[i].vy+=fy*a; n[j].vx-=fx*a; n[j].vy-=fy*a;
+  const a = MAP.alpha;
+  const live = MAP.nodes.filter(nd=>nd.shown || nd.a>0.02);  // simulate visible + fading
+  for(let i=0;i<live.length;i++) for(let j=i+1;j<live.length;j++){
+    const p=live[i], q=live[j];
+    let dx=p.x-q.x, dy=p.y-q.y, d2=dx*dx+dy*dy;
+    if(d2<1){ d2=1; dx=((i-j)||1); dy=0.5; }
+    const d=Math.sqrt(d2); if(d>360) continue;
+    const charge = (p.level===1||q.level===1)?11000 : (p.level===2||q.level===2)?5200 : 2600;
+    const f=charge/d2, fx=dx/d*f, fy=dy/d*f;
+    p.vx+=fx*a; p.vy+=fy*a; q.vx-=fx*a; q.vy-=fy*a;
   }
   MAP.edges.forEach(([p,q])=>{
-    let dx=q.x-p.x, dy=q.y-p.y, d=Math.hypot(dx,dy)||1, f=(d-96)*0.02;
+    if(!(p.shown||p.a>0.02) || !(q.shown||q.a>0.02)) return;
+    const rest = q.level===2?100:58;
+    let dx=q.x-p.x, dy=q.y-p.y, d=Math.hypot(dx,dy)||1, f=(d-rest)*0.03;
     const fx=dx/d*f, fy=dy/d*f; p.vx+=fx*a; p.vy+=fy*a; q.vx-=fx*a; q.vy-=fy*a;
   });
-  n.forEach(p=>{
+  MAP.nodes.forEach(p=>{
     if(p===MAP.drag){ p.vx=0; p.vy=0; return; }
-    p.vx += -p.x*0.004*a; p.vy += -p.y*0.004*a;
+    if(!(p.shown||p.a>0.02)){ p.vx=0; p.vy=0; return; }
+    if(p.level===1 && p.anchor){ p.vx += (p.anchor.x-p.x)*0.02*a; p.vy += (p.anchor.y-p.y)*0.02*a; } // anchored
     p.vx*=0.85; p.vy*=0.85; p.x+=p.vx; p.y+=p.vy;
   });
-  MAP.alpha *= 0.99;
+  MAP.alpha *= 0.985;
 }
 const w2s = p => ({ x:p.x*MAP.scale+MAP.ox, y:p.y*MAP.scale+MAP.oy });
 const s2w = (sx,sy) => ({ x:(sx-MAP.ox)/MAP.scale, y:(sy-MAP.oy)/MAP.scale });
 
+function mapLabel(ctx,text,s,r,size,bold){
+  ctx.font=(bold?'700 ':'')+size+'px ui-monospace, monospace';
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillStyle='rgba(233,239,248,0.9)';
+  ctx.fillText(text.length>22?text.slice(0,21)+'…':text, s.x, s.y+r+3);
+}
+function drawConceptNode(ctx,s,nd,col,pulse){
+  const A=nd.a; ctx.globalAlpha=A;
+  const r0=Math.max(4,Math.min(22,10*MAP.scale))*(0.55+0.45*A);
+  const st=conceptState(nd.id); let r=r0;
+  ctx.beginPath();
+  if(st==='weak'){
+    r=r0+2*pulse; ctx.shadowColor=colorVal('var(--hplow)'); ctx.shadowBlur=8+10*pulse;
+    ctx.fillStyle=`rgba(255,77,77,${0.20+0.30*pulse})`; ctx.strokeStyle=colorVal('var(--hplow)'); ctx.lineWidth=2;
+    ctx.arc(s.x,s.y,r,0,7); ctx.fill(); ctx.stroke(); ctx.shadowBlur=0;
+  } else if(st==='mastered'){
+    ctx.shadowColor=col; ctx.shadowBlur=14; ctx.fillStyle=col; ctx.arc(s.x,s.y,r,0,7); ctx.fill();
+    ctx.shadowBlur=0; ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke();
+  } else if(st==='read'){
+    ctx.save(); ctx.globalAlpha=A*0.14; ctx.fillStyle=col; ctx.arc(s.x,s.y,r,0,7); ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.arc(s.x,s.y,r,0,7); ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke();
+  } else {
+    ctx.save(); ctx.globalAlpha=A*0.45; ctx.lineWidth=1.5; ctx.strokeStyle=col; ctx.arc(s.x,s.y,r,0,7); ctx.stroke(); ctx.restore();
+  }
+  ctx.globalAlpha=A;
+  if(MAP.scale>0.55) mapLabel(ctx,nd.title,s,r,10,false);
+}
+function drawGroupNode(ctx,s,nd,col){
+  const A=nd.a, big=nd.level===1; ctx.globalAlpha=A;
+  const r=(big?Math.max(16,Math.min(46,24*MAP.scale)):Math.max(9,Math.min(30,15*MAP.scale)))*(0.6+0.4*A);
+  ctx.beginPath(); ctx.arc(s.x,s.y,r,0,7);
+  ctx.shadowColor=col; ctx.shadowBlur=big?18:8;
+  ctx.globalAlpha=A*(big?0.9:0.42); ctx.fillStyle=col; ctx.fill();
+  ctx.shadowBlur=0; ctx.globalAlpha=A; ctx.lineWidth=big?2.5:1.8; ctx.strokeStyle=col; ctx.stroke();
+  if(nd.children.length && !nd.expanded){                 // collapsed → "+" affordance
+    ctx.strokeStyle='#0b0e16'; ctx.lineWidth=2; ctx.beginPath();
+    ctx.moveTo(s.x-r*0.38,s.y); ctx.lineTo(s.x+r*0.38,s.y);
+    ctx.moveTo(s.x,s.y-r*0.38); ctx.lineTo(s.x,s.y+r*0.38); ctx.stroke();
+  }
+  ctx.globalAlpha=A;
+  const showLbl = big || MAP.scale>0.4;
+  if(showLbl) mapLabel(ctx, nd.title+(nd.children.length&&!nd.expanded?` (${nd.children.length})`:''), s, r, big?13:11, big);
+}
 function renderMap(){
   const ctx = MAP.ctx; if(!ctx) return;
   ctx.setTransform(MAP.dpr,0,0,MAP.dpr,0,0);
   ctx.clearRect(0,0,MAP.cssW,MAP.cssH);
-  const t = performance.now()/1000, pulse = 0.5+0.5*Math.sin(t*3.5);
-  // edges
-  ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(120,150,190,0.22)';
-  MAP.edges.forEach(([p,q])=>{ const a=w2s(p), b=w2s(q); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); });
-  // nodes
-  const r0 = Math.max(5, Math.min(30, 13*MAP.scale));
-  MAP.nodes.forEach(nd=>{
-    const s = w2s(nd), col = subjColor(nd.subject), st = conceptState(nd.id);
-    let r = r0;
-    ctx.save(); ctx.beginPath();
-    if(st==='weak'){
-      r = r0 + 2*pulse; ctx.shadowColor = colorVal('var(--hplow)'); ctx.shadowBlur = 8+10*pulse;
-      ctx.fillStyle = `rgba(255,77,77,${0.20+0.30*pulse})`; ctx.strokeStyle = colorVal('var(--hplow)'); ctx.lineWidth = 2;
-      ctx.arc(s.x,s.y,r,0,7); ctx.fill(); ctx.stroke();
-    } else if(st==='mastered'){
-      ctx.shadowColor = col; ctx.shadowBlur = 14; ctx.fillStyle = col; ctx.globalAlpha = 0.9;
-      ctx.arc(s.x,s.y,r,0,7); ctx.fill(); ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0; ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
-    } else if(st==='read'){
-      ctx.fillStyle = col; ctx.globalAlpha = 0.14; ctx.arc(s.x,s.y,r,0,7); ctx.fill(); ctx.globalAlpha = 1;
-      ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
-    } else { // untouched — dim hollow
-      ctx.lineWidth = 1.5; ctx.strokeStyle = col; ctx.globalAlpha = 0.4; ctx.arc(s.x,s.y,r,0,7); ctx.stroke(); ctx.globalAlpha = 1;
-    }
+  const pulse = 0.5+0.5*Math.sin(performance.now()/1000*3.5);
+  // edges (only where both endpoints are visible)
+  MAP.edges.forEach(([p,q])=>{
+    const av=Math.min(p.a,q.a); if(av<0.03) return;
+    const A=w2s(p), B=w2s(q);
+    ctx.lineWidth=q.level===2?1.4:1; ctx.strokeStyle=`rgba(120,150,190,${0.22*av})`;
+    ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.stroke();
+  });
+  // nodes: subjects (bottom) ▸ chapters ▸ concepts (top)
+  const order=TREE.subjects.concat(TREE.chapters, TREE.concepts);
+  order.forEach(nd=>{
+    if(nd.a<0.03) return;
+    const s=w2s(nd), col=subjColor(nd.subject);
+    ctx.save();
+    if(nd.level===3) drawConceptNode(ctx,s,nd,col,pulse); else drawGroupNode(ctx,s,nd,col);
     ctx.restore();
-    if(MAP.scale > 0.5){
-      ctx.font = '11px ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillStyle = 'rgba(233,239,248,0.82)';
-      ctx.fillText(nd.title.length>22?nd.title.slice(0,21)+'…':nd.title, s.x, s.y+r+4);
-    }
   });
 }
 function mapFrame(){
   if($('#mindmap').classList.contains('hidden')){ MAP.raf = null; return; }
   if(MAP.alpha > 0.02) stepMap();
+  MAP.nodes.forEach(p=>{ p.a += ((p.shown?1:0) - (p.a||0))*0.16; }); // expand/collapse fade
   renderMap();
   MAP.raf = requestAnimationFrame(mapFrame);
 }
@@ -1803,9 +1921,16 @@ function openConcept(node){
 
 /* --- interaction: drag nodes, pan, wheel-zoom, tap-to-open --- */
 function mapHit(sx,sy){
-  const w = s2w(sx,sy); let best=null, bd=18*18/(MAP.scale*MAP.scale===0?1:1);
-  const rW = 16; // world-space pick radius
-  for(const nd of MAP.nodes){ const dx=nd.x-w.x, dy=nd.y-w.y, d2=dx*dx+dy*dy; if(d2<rW*rW && (!best || d2<bd)){ best=nd; bd=d2; } }
+  let best=null, bd=Infinity;
+  for(const nd of MAP.nodes){
+    if(nd.a<0.2) continue;                 // only pick reasonably-visible nodes
+    const s=w2s(nd);
+    const vr=(nd.level===1?Math.max(16,Math.min(46,24*MAP.scale))
+            :nd.level===2?Math.max(9,Math.min(30,15*MAP.scale))
+            :Math.max(4,Math.min(22,10*MAP.scale)))+7;
+    const dx=s.x-sx, dy=s.y-sy, d2=dx*dx+dy*dy;
+    if(d2<vr*vr && d2<bd){ best=nd; bd=d2; }
+  }
   return best;
 }
 function zoomAt(sx,sy,factor){
@@ -1832,7 +1957,7 @@ function attachMapEvents(){
   });
   const end = e=>{
     const wasDrag = MAP.drag;
-    if(wasDrag && MAP.down && MAP.down.moved < 5 && performance.now()-MAP.down.t < 400){ openConcept(wasDrag); }
+    if(wasDrag && MAP.down && MAP.down.moved < 5 && performance.now()-MAP.down.t < 400){ onTapNode(wasDrag); }
     MAP.drag = null; MAP.pan = null; MAP.down = null;
   };
   c.addEventListener('pointerup', end);
@@ -1843,6 +1968,8 @@ attachMapEvents();
 window.addEventListener('resize', ()=>{ if(!$('#mindmap').classList.contains('hidden')){ resizeMap(); } });
 
 $('#mapBtn').addEventListener('click', openMap);
+$('#mapExpand').addEventListener('click', expandAll);
+$('#mapCollapse').addEventListener('click', collapseAll);
 $('#mapReset').addEventListener('click', resetMapLayout);
 $('#mapZoomIn').addEventListener('click', ()=>zoomAt(MAP.cssW/2, MAP.cssH/2, 1.2));
 $('#mapZoomOut').addEventListener('click', ()=>zoomAt(MAP.cssW/2, MAP.cssH/2, 1/1.2));
