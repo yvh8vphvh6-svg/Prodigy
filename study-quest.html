@@ -81,7 +81,7 @@
   .center{ align-items:center; justify-content:center; text-align:center; padding:24px; gap:20px; }
   /* gentle entrance whenever a screen is shown (display:none → flex replays it) */
   @keyframes screenIn{ from{ opacity:0; transform:translateY(10px) } to{ opacity:1; transform:none } }
-  #select,#cram,#library,#mindmap{ animation:screenIn .5s var(--ease-out) both; }
+  #select,#cram,#library,#mindmap,#flash{ animation:screenIn .5s var(--ease-out) both; }
 
   .eyebrow{ font-family:var(--mono); font-size:11px; letter-spacing:.34em; text-transform:uppercase; color:var(--dim); }
   h1{ font-size:clamp(36px,7.4vw,66px); font-weight:900; letter-spacing:-.03em; margin:0; line-height:.94;
@@ -482,6 +482,50 @@
   .deckhint{ font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
   .decknav{ display:flex; gap:10px; }
 
+  /* ---------- flashcards mode (Phase 4) ---------- */
+  #flash{ overflow:auto; padding:16px max(16px,env(safe-area-inset-left)) calc(16px + env(safe-area-inset-bottom)); }
+  .flashwrap{ width:min(820px,100%); margin:0 auto; display:flex; flex-direction:column; gap:14px; }
+  .flashtop{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .flashtop .good{ color:var(--reagent); }
+  .flashtop .btn{ padding:8px 14px; font-size:11px; }
+  .flashtop #flashAdd{ margin-left:auto; }
+  .decklist{ display:flex; flex-direction:column; gap:9px; }
+  .deckrow{ text-align:left; color:var(--text); background:var(--glass); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
+    border:1px solid var(--glass-brd); border-radius:13px; padding:13px 15px; cursor:pointer; box-shadow:var(--shadow-sm);
+    display:flex; align-items:center; gap:12px; transition:transform .2s var(--ease-out), border-color .2s, box-shadow .25s; }
+  .deckrow:hover{ transform:translateX(3px); border-color:var(--reagent); box-shadow:var(--shadow-sm), 0 0 20px -6px rgba(47,224,168,.4); }
+  .deckrow:focus-visible{ outline:3px solid var(--reagent); outline-offset:2px; }
+  .deckrow.sub{ margin-left:20px; }
+  .deckrow .dtag{ font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+    padding:3px 8px; border-radius:6px; border:1px solid var(--el,var(--line2)); color:var(--el,var(--muted)); flex:none; }
+  .deckrow .dmeta{ flex:1; min-width:0; }
+  .deckrow h3{ margin:0; font-size:15px; }
+  .deckrow .dsub{ margin:2px 0 0; font-size:11px; color:var(--dim); font-family:var(--mono); letter-spacing:.03em; }
+  .deckrow .dcounts{ display:flex; gap:8px; flex:none; font-family:var(--mono); font-size:11px; }
+  .deckrow .cdue{ color:var(--reagent); } .deckrow .cnew{ color:var(--gold); } .deckrow .call{ color:var(--dim); }
+  .deckhead{ font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin:8px 2px 0; }
+  .flashsessbar{ display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:12px; color:var(--muted); }
+  .flashsessbar .grow{ flex:1; }
+  .flashsessbar .btn{ padding:7px 12px; font-size:10.5px; }
+  #flashStudy{ display:flex; flex-direction:column; align-items:center; gap:14px; }
+  #flashStudy .deckcard{ width:min(620px,100%); }
+  .flashhint{ font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+  .flashgrades{ display:grid; grid-template-columns:repeat(4,1fr); gap:9px; width:min(620px,100%); }
+  .flashgrades .grade{ font-family:var(--mono); font-size:13px; letter-spacing:.04em; text-transform:uppercase;
+    padding:12px 8px; border-radius:11px; cursor:pointer; color:var(--text); background:rgba(255,255,255,.04);
+    border:1px solid var(--glass-brd); display:flex; flex-direction:column; align-items:center; gap:3px;
+    transition:transform .15s var(--ease-out), border-color .18s, box-shadow .2s; }
+  .flashgrades .grade small{ font-size:9px; opacity:.5; }
+  .flashgrades .grade:hover{ transform:translateY(-2px); }
+  .flashgrades .again{ border-color:rgba(255,77,77,.5); color:#ff8a8a; }
+  .flashgrades .again:hover{ box-shadow:0 0 18px -6px rgba(255,77,77,.6); }
+  .flashgrades .hard{ border-color:rgba(255,180,84,.5); color:#ffc879; }
+  .flashgrades .hard:hover{ box-shadow:0 0 18px -6px rgba(255,180,84,.6); }
+  .flashgrades .good{ border-color:rgba(94,224,160,.5); color:#7ff0bf; }
+  .flashgrades .good:hover{ box-shadow:0 0 18px -6px rgba(94,224,160,.6); }
+  .flashgrades .easy{ border-color:rgba(90,166,255,.5); color:#8fc2ff; }
+  .flashgrades .easy:hover{ box-shadow:0 0 18px -6px rgba(90,166,255,.6); }
+
   @media (prefers-reduced-motion: reduce){
     *{ animation:none !important; transition:none !important; }
     body::after{ display:none; }        /* drop the animated background glow */
@@ -503,6 +547,7 @@
       <button class="btn" id="cramBtn">📖 cram mode — rapid-fire drill</button>
       <button class="btn" id="libBtn">📚 library — read &amp; take notes</button>
       <button class="btn" id="mapBtn">🕸 mind map — your knowledge graph</button>
+      <button class="btn" id="flashBtn">🃏 flashcards</button>
     </div>
     <div class="roster" id="roster"></div>
     <div class="eyebrow" style="opacity:.6">↑ tap a student to battle · or study without combat</div>
@@ -672,6 +717,40 @@
       <button id="mapZoomIn" aria-label="zoom in">+</button>
       <button id="mapZoomOut" aria-label="zoom out">−</button>
     </div>
+  </section>
+
+  <!-- ===== FLASHCARDS MODE (Phase 4) — SM-2 spaced repetition ===== -->
+  <section id="flash" class="screen hidden">
+    <div class="flashwrap">
+      <div class="flashtop">
+        <span class="chip" id="flashSubj">ALL</span>
+        <span class="chip good" id="flashDue">0 due</span>
+        <button class="btn ghost" id="flashAdd">＋ add card</button>
+        <button class="btn ghost" id="flashQuit">back to select</button>
+      </div>
+      <!-- deck browser -->
+      <div id="deckList" class="decklist"></div>
+      <!-- study session -->
+      <div id="flashStudy" class="hidden">
+        <div class="flashsessbar"><span id="flashProg">0 / 0</span><span class="grow"></span>
+          <span id="flashDeckName" class="chip"></span>
+          <button class="btn ghost" id="flashEnd">end session</button></div>
+        <div class="deckcard" id="flashCard">
+          <div class="deckface deckfront" id="flashFront"></div>
+          <div class="deckface deckback" id="flashBack"></div>
+        </div>
+        <div class="flashhint" id="flashHint">tap to flip</div>
+        <div class="flashgrades" id="flashGrades">
+          <button class="grade again" data-q="1" type="button">Again<small>1</small></button>
+          <button class="grade hard" data-q="3" type="button">Hard<small>2</small></button>
+          <button class="grade good" data-q="4" type="button">Good<small>3</small></button>
+          <button class="grade easy" data-q="5" type="button">Easy<small>4</small></button>
+        </div>
+      </div>
+      <!-- end-of-session summary (reuses cramsummary styling) -->
+      <div id="flashSummary" class="cramsummary hidden"></div>
+    </div>
+    <div id="flashAddModal" class="mkoverlay hidden"><div class="mkbox" id="flashAddBox"></div></div>
   </section>
 
   <!-- ===== VICTORY / DEFEAT ===== -->
@@ -991,13 +1070,14 @@ const CHARACTERS = [
 const SAVE_KEY = "clinicalQuestSave";
 function loadMeta(){
   const fresh = { unlocked:[], lastChar:null, notes:{}, lessonsDone:[], concepts:{},
-                  userQuestions:[], userCards:[],
+                  userQuestions:[], userCards:[], manualCards:[], srs:{},
                   progress:{corrects:0, wins:0, bestStreak:0, bestTier:0, bestLevel:1} };
   try{
     const m = JSON.parse(localStorage.getItem(SAVE_KEY)) || {};
     return { unlocked:m.unlocked||[], lastChar:m.lastChar||null,
              notes:m.notes||{}, lessonsDone:m.lessonsDone||[], concepts:m.concepts||{},
              userQuestions:m.userQuestions||[], userCards:m.userCards||[],
+             manualCards:m.manualCards||[], srs:m.srs||{},        // Phase 4: manual cards + SM-2 schedule
              progress:Object.assign(fresh.progress, m.progress) };
   }catch(e){ return fresh; }
 }
@@ -1126,6 +1206,7 @@ function buildRoster(){
     if(open) el.addEventListener('click', ()=>startRun(c));
     wrap.appendChild(el);
   });
+  if(typeof refreshDueBadge==='function') refreshDueBadge(); // Phase 4: "N due" on the flashcards button
 }
 
 function startRun(c){
@@ -2569,6 +2650,240 @@ $('#deckDel').addEventListener('click', deckDelete);
 $('#deckClose').addEventListener('click', closeDeck);
 $('#maker').addEventListener('mousedown', e=>{ if(e.target.id==='maker') closeMaker(); });
 $('#deck').addEventListener('mousedown', e=>{ if(e.target.id==='deck') closeDeck(); });
+
+/* =====================================================================
+   10) FLASHCARDS (Phase 4) — spaced repetition (lightweight SM-2).
+   Decks are auto-derived from the concept graph (All / per-subject / per-
+   chapter), from your Phase-2 PDF-highlight flashcards (per PDF), and from
+   manual cards. Each reviewed card stores {ease, interval, reps, due} in
+   META.srs (localStorage). Self-grade Again/Hard/Good/Easy → SM-2 reschedule.
+   Good/Easy count toward unlock progress. No Claude API.
+   ===================================================================== */
+const FLASH = { cards:[], pdfMap:{}, session:null };
+
+/* ---- SM-2 update. quality: Again=1, Hard=3, Good=4, Easy=5 (<3 = lapse) ---- */
+function sm2(state, q){
+  let ease=state.ease||2.5, interval=state.interval||0, reps=state.reps||0;
+  if(q<3){ reps=0; interval=0; }                                   // lapse → relearn
+  else { reps+=1; interval = reps===1 ? 1 : reps===2 ? 6 : Math.round(interval*ease); }
+  ease = Math.max(1.3, ease + (0.1 - (5-q)*(0.08 + (5-q)*0.02)));
+  return { ease:Math.round(ease*100)/100, interval, reps, due: Date.now() + interval*86400000 };
+}
+function fmtDue(ts){
+  const d=Math.round((ts-Date.now())/86400000);
+  if(d<=0) return 'now'; if(d===1) return 'in 1 day'; if(d<30) return `in ${d} days`;
+  const m=Math.round(d/30); return m<=1?'in ~1 month':`in ~${m} months`;
+}
+function dueCount(){ const now=Date.now(), s=META.srs||{}; let n=0; for(const k in s) if(s[k].due<=now) n++; return n; }
+function dueInCards(cards){ const now=Date.now(); return cards.filter(c=>{ const s=META.srs[c.id]; return s && s.due<=now; }).length; }
+function refreshDueBadge(){ const b=$('#flashBtn'); if(!b) return; const n=dueCount();
+  b.innerHTML = `🃏 flashcards${n?` — <b>${n}</b> due`:''}`; }
+
+/* ---- unify all card sources into one list of {id, source, subject, chapter, front, back} ---- */
+function buildAllCards(pdfMap){
+  const cards=[];
+  QUESTION_BANK.forEach((qq,i)=>cards.push({ id:'qb:'+i, source:'bank', subject:qq.subject, chapter:qq.chapter,
+    front:qq.q, back:'✓ '+qq.choices[qq.answer]+(qq.why?('\n\n'+qq.why):'') }));
+  (META.userCards||[]).forEach(c=>{ const p=(pdfMap||{})[c.pdfId]||{};
+    cards.push({ id:'uc:'+c.id, source:'pdf', subject:p.subject||null, chapter:p.chapter||null,
+      pdfId:c.pdfId, pdfName:p.name||'PDF', front:c.front, back:c.back }); });
+  (META.manualCards||[]).forEach(c=>cards.push({ id:'mc:'+c.id, source:'manual', subject:c.subject||null,
+    chapter:c.chapter||null, front:c.front, back:c.back }));
+  return cards;
+}
+function subjectsPresent(cards){
+  const present=[...new Set(cards.map(c=>c.subject).filter(Boolean))];
+  return SUBJ_ORDER.filter(s=>present.includes(s)).concat(present.filter(s=>!SUBJ_ORDER.includes(s)));
+}
+/* ---- derive the deck list (respects the subject tab) ---- */
+function buildDecks(){
+  const sel=subjectSel;
+  const cards = sel==='All' ? FLASH.cards : FLASH.cards.filter(c=>c.subject===sel);
+  const out=[];
+  out.push({ type:'deck', key:'all', title: sel==='All'?'All cards':`All ${sel} cards`,
+             subtitle:'everything, due first', cards:cards.slice(), color:'var(--reagent)' });
+  subjectsPresent(cards).forEach(subj=>{
+    const subjCards=cards.filter(c=>c.subject===subj); if(!subjCards.length) return;
+    const col=colorVal((ELEMENTS[subj]||ELEMENTS['A&P']).css);
+    if(sel==='All') out.push({ type:'deck', key:'subj:'+subj, title:subj, subtitle:'whole subject', cards:subjCards, color:col });
+    [...new Set(subjCards.filter(c=>c.chapter).map(c=>c.chapter))].sort().forEach(ch=>{
+      out.push({ type:'deck', key:'chap:'+subj+'/'+ch, title:ch, subtitle:subj+' · chapter',
+                 cards:subjCards.filter(c=>c.chapter===ch), color:col, sub:true });
+    });
+  });
+  const pdfG={};
+  cards.filter(c=>c.source==='pdf').forEach(c=>{ (pdfG[c.pdfId]=pdfG[c.pdfId]||{name:c.pdfName,cards:[]}).cards.push(c); });
+  const pk=Object.keys(pdfG);
+  if(pk.length){ out.push({ type:'head', label:'from your PDFs' });
+    pk.forEach(id=>out.push({ type:'deck', key:'pdf:'+id, title:'📄 '+pdfG[id].name, subtitle:'highlight flashcards', cards:pdfG[id].cards, color:'var(--gold)' })); }
+  const manual=cards.filter(c=>c.source==='manual');
+  if(manual.length){ out.push({ type:'head', label:'your cards' });
+    out.push({ type:'deck', key:'manual', title:'✍ Manual cards', subtitle:'added by you', cards:manual, color:'var(--cell)' }); }
+  return out;
+}
+function deckStats(deck){
+  const now=Date.now(); let due=0, fresh=0;
+  deck.cards.forEach(c=>{ const s=META.srs[c.id]; if(!s) fresh++; else if(s.due<=now) due++; });
+  return { due, fresh, total:deck.cards.length };
+}
+function deckNextDue(deck){
+  const now=Date.now(); let min=Infinity;
+  deck.cards.forEach(c=>{ const s=META.srs[c.id]; if(s && s.due>now) min=Math.min(min, s.due); });
+  return min===Infinity ? null : fmtDue(min);
+}
+
+/* ---- open / deck browser ---- */
+async function openFlashcards(){
+  SFX.init(); SFX.resume();
+  const pdfMap={};
+  try{ if(await PDFDB.available()){ (await PDFDB.getAll('pdfs')).forEach(p=>pdfMap[p.id]=p); } }catch(e){}
+  FLASH.pdfMap=pdfMap; FLASH.cards=buildAllCards(pdfMap);
+  const ids=new Set(FLASH.cards.map(c=>c.id)); let changed=false;   // prune orphaned schedules
+  for(const k in META.srs){ if(!ids.has(k)){ delete META.srs[k]; changed=true; } }
+  if(changed) saveMeta();
+  $('#select').classList.add('hidden'); $('#flash').classList.remove('hidden');
+  showDeckList(); refreshDueBadge();
+}
+function quitFlash(){ FLASH.session=null; $('#flash').classList.add('hidden'); buildRoster(); $('#select').classList.remove('hidden'); }
+function showDeckList(){
+  FLASH.session=null;
+  $('#flashStudy').classList.add('hidden'); $('#flashSummary').classList.add('hidden'); $('#deckList').classList.remove('hidden');
+  $('#flashSubj').textContent=subjectSel.toUpperCase();
+  const pool = subjectSel==='All' ? FLASH.cards : FLASH.cards.filter(c=>c.subject===subjectSel);
+  $('#flashDue').textContent = `${dueInCards(pool)} due`;
+  const wrap=$('#deckList'); wrap.innerHTML='';
+  if(!FLASH.cards.length){ wrap.innerHTML=`<p style="color:var(--muted); font-size:14px">No cards yet. They come from the question bank, your PDF highlights, and “＋ add card”.</p>`; return; }
+  buildDecks().forEach(d=>{
+    if(d.type==='head'){ const h=document.createElement('div'); h.className='deckhead'; h.textContent=d.label; wrap.appendChild(h); return; }
+    const st=deckStats(d);
+    const row=document.createElement('button'); row.type='button'; row.className='deckrow'+(d.sub?' sub':'');
+    row.style.setProperty('--el', d.color||'var(--reagent)');
+    row.innerHTML=`<span class="dtag">deck</span>
+      <div class="dmeta"><h3>${escapeHtml(d.title)}</h3><p class="dsub">${escapeHtml(d.subtitle||'')}</p></div>
+      <div class="dcounts">${st.due?`<span class="cdue">${st.due} due</span>`:''}${st.fresh?`<span class="cnew">${st.fresh} new</span>`:''}<span class="call">${st.total} total</span></div>`;
+    row.addEventListener('click', ()=>startDeck(d));
+    wrap.appendChild(row);
+  });
+}
+
+/* ---- study session ---- */
+function startDeck(deck){
+  const now=Date.now();
+  const due=deck.cards.filter(c=>{ const s=META.srs[c.id]; return s && s.due<=now; }).sort((a,b)=>META.srs[a.id].due-META.srs[b.id].due);
+  const fresh=deck.cards.filter(c=>!META.srs[c.id]);
+  const queue=due.concat(fresh);                                    // due first, then new
+  if(!queue.length){ offerStudyAhead(deck); return; }
+  FLASH.session={ deck, queue, i:0, flipped:false, reviewed:0, again:0 };
+  $('#flashDeckName').textContent=deck.title.slice(0,26);
+  showCard();
+}
+function offerStudyAhead(deck){
+  $('#deckList').classList.add('hidden'); $('#flashStudy').classList.add('hidden');
+  const el=$('#flashSummary'); el.classList.remove('hidden');
+  const nd=deckNextDue(deck);
+  el.innerHTML=`<h2>All caught up 🎉</h2>
+    <div class="nums">Nothing is due in this deck right now.${nd?` Next due <b>${nd}</b>.`:''}</div>
+    <p style="color:var(--muted); font-size:14px">You can still review ahead of schedule.</p>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:12px">
+      <button class="btn primary" id="flashAhead" type="button">study ${deck.cards.length} ahead ▸</button>
+      <button class="btn ghost" id="flashBack2" type="button">back to decks</button></div>`;
+  $('#flashAhead').addEventListener('click', ()=>{
+    const q=deck.cards.slice().sort((a,b)=>((META.srs[a.id]||{}).due||0)-((META.srs[b.id]||{}).due||0));
+    FLASH.session={ deck, queue:q, i:0, flipped:false, reviewed:0, again:0 };
+    $('#flashDeckName').textContent=deck.title.slice(0,26); el.classList.add('hidden'); showCard();
+  });
+  $('#flashBack2').addEventListener('click', showDeckList);
+}
+function showCard(){
+  const s=FLASH.session; if(!s) return; const card=s.queue[s.i];
+  $('#deckList').classList.add('hidden'); $('#flashSummary').classList.add('hidden'); $('#flashStudy').classList.remove('hidden');
+  s.flipped=false;
+  $('#flashProg').textContent=`${Math.min(s.i+1, s.queue.length)} / ${s.queue.length}`;
+  $('#flashCard').className='deckcard';
+  $('#flashFront').textContent=card.front;
+  $('#flashBack').textContent=card.back;
+  $('#flashHint').textContent='tap the card to flip';
+  $('#flashGrades').style.visibility='hidden';
+}
+function flipFlash(){ const s=FLASH.session; if(!s||s.flipped) return;
+  s.flipped=true; $('#flashCard').className='deckcard flipped';
+  $('#flashHint').textContent='how well did you know it?'; $('#flashGrades').style.visibility='visible'; }
+function gradeCard(q){
+  const s=FLASH.session; if(!s||!s.flipped) return;
+  const card=s.queue[s.i];
+  META.srs[card.id]=sm2(META.srs[card.id]||{}, q);
+  if(q>=4) bumpProgress('corrects',1);                             // Good/Easy → unlock progress
+  s.reviewed++;
+  if(q<3){ s.again++; s.queue.push(card); }                        // Again → see it again this session
+  q>=4?SFX.hit(false):SFX.hurt();
+  saveMeta();
+  s.i++;
+  if(s.i>=s.queue.length) endSession(); else showCard();
+}
+function endSession(){
+  const s=FLASH.session; if(!s) return; FLASH.session=null;
+  const nd=deckNextDue(s.deck);
+  $('#flashStudy').classList.add('hidden');
+  const el=$('#flashSummary'); el.classList.remove('hidden');
+  el.innerHTML=`<h2>Session complete</h2>
+    <div class="nums">REVIEWED <b>${s.reviewed}</b> · AGAIN <b>${s.again}</b> · NEXT DUE <b>${nd||'—'}</b></div>
+    <p style="color:var(--muted); font-size:14px">Schedule saved. “Good” and “Easy” counted toward your unlocks.</p>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:12px">
+      <button class="btn primary" id="flashDone" type="button">back to decks ▸</button>
+      <button class="btn ghost" id="flashHome" type="button">back to select</button></div>`;
+  SFX.win(); refreshDueBadge();
+  $('#flashDone').addEventListener('click', ()=>{ FLASH.cards=buildAllCards(FLASH.pdfMap); showDeckList(); });
+  $('#flashHome').addEventListener('click', quitFlash);
+}
+
+/* ---- manual add-card form ---- */
+function openAddCard(){
+  const sel=subjectSel==='All'?SUBJECTS[0]:subjectSel;
+  $('#flashAddBox').innerHTML=`
+    <div class="mkhead">Add a flashcard <span class="mkclose" id="fcClose">✕</span></div>
+    <label class="mklab">Front — term / question</label>
+    <textarea id="fcFront" class="mkin" rows="2" placeholder="e.g. Functional unit of the kidney?"></textarea>
+    <label class="mklab">Back — answer / definition</label>
+    <textarea id="fcBack" class="mkin" rows="3" placeholder="e.g. The nephron — filters blood and forms urine."></textarea>
+    <div class="mktagrow">
+      <div><label class="mklab">Subject</label><select id="fcSubject" class="mkin">${SUBJECTS.map(s=>`<option${s===sel?' selected':''}>${escapeHtml(s)}</option>`).join('')}</select></div>
+      <div style="flex:1; min-width:150px"><label class="mklab">Chapter (optional)</label><input id="fcChapter" class="mkin" placeholder="e.g. Renal"/></div>
+    </div>
+    <div class="mkerr" id="fcErr"></div>
+    <div class="mkactions"><button class="btn primary" id="fcSave" type="button">save card</button><button class="btn ghost" id="fcCancel" type="button">cancel</button></div>`;
+  $('#flashAddModal').classList.remove('hidden');
+  $('#fcClose').onclick=closeAddCard; $('#fcCancel').onclick=closeAddCard;
+  $('#fcSave').addEventListener('click', saveManualCard);
+  $('#fcFront').focus();
+}
+function closeAddCard(){ $('#flashAddModal').classList.add('hidden'); }
+function saveManualCard(){
+  const front=$('#fcFront').value.trim(), back=$('#fcBack').value.trim();
+  const subject=$('#fcSubject').value, chapter=$('#fcChapter').value.trim()||null;
+  if(!front||!back){ $('#fcErr').textContent='Fill in both the front and the back.'; return; }
+  META.manualCards.push({ id:uid('mc-'), front, back, subject, chapter, createdAt:Date.now() });
+  saveMeta(); closeAddCard();
+  FLASH.cards=buildAllCards(FLASH.pdfMap); showDeckList();
+  showToast('✓ card added');
+}
+
+/* ---- wiring ---- */
+$('#flashBtn').addEventListener('click', openFlashcards);
+$('#flashQuit').addEventListener('click', quitFlash);
+$('#flashAdd').addEventListener('click', openAddCard);
+$('#flashEnd').addEventListener('click', ()=>{ if(FLASH.session) endSession(); else showDeckList(); });
+$('#flashCard').addEventListener('click', flipFlash);
+$('#flashGrades').addEventListener('click', e=>{ const b=e.target.closest('.grade'); if(b) gradeCard(+b.dataset.q); });
+$('#flashAddModal').addEventListener('mousedown', e=>{ if(e.target.id==='flashAddModal') closeAddCard(); });
+document.addEventListener('keydown', e=>{
+  if($('#flash').classList.contains('hidden')) return;
+  if(!$('#flashAddModal').classList.contains('hidden')){ if(e.key==='Escape') closeAddCard(); return; }
+  if($('#flashStudy').classList.contains('hidden')) return;
+  if(document.activeElement && /TEXTAREA|INPUT|SELECT/.test(document.activeElement.tagName)) return;
+  if(e.key===' '||e.key==='Enter'){ e.preventDefault(); flipFlash(); return; }
+  if(FLASH.session && FLASH.session.flipped){ const m={'1':1,'2':3,'3':4,'4':5}; if(m[e.key]!==undefined){ e.preventDefault(); gradeCard(m[e.key]); } }
+});
+refreshDueBadge();
 
 /* =====================================================================
    ROADMAP HOOKS for Claude Code (build these next, in your repo):
