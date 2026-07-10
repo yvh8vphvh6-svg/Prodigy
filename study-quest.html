@@ -81,7 +81,7 @@
   .center{ align-items:center; justify-content:center; text-align:center; padding:24px; gap:20px; }
   /* gentle entrance whenever a screen is shown (display:none → flex replays it) */
   @keyframes screenIn{ from{ opacity:0; transform:translateY(10px) } to{ opacity:1; transform:none } }
-  #select,#cram,#library,#mindmap,#flash{ animation:screenIn .5s var(--ease-out) both; }
+  #select,#cram,#library,#mindmap,#flash,#author{ animation:screenIn .5s var(--ease-out) both; }
 
   .eyebrow{ font-family:var(--mono); font-size:11px; letter-spacing:.34em; text-transform:uppercase; color:var(--dim); }
   h1{ font-size:clamp(36px,7.4vw,66px); font-weight:900; letter-spacing:-.03em; margin:0; line-height:.94;
@@ -526,6 +526,65 @@
   .flashgrades .easy{ border-color:rgba(90,166,255,.5); color:#8fc2ff; }
   .flashgrades .easy:hover{ box-shadow:0 0 18px -6px rgba(90,166,255,.6); }
 
+  /* ---------- settings gear + Author mode (Phase 5) ---------- */
+  .gear{ position:absolute; top:14px; right:16px; z-index:5; width:38px; height:38px; border-radius:11px;
+    border:1px solid var(--glass-brd); background:var(--glass); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
+    color:var(--muted); font-size:17px; cursor:pointer; box-shadow:var(--shadow-sm);
+    transition:transform .3s var(--ease), border-color .2s, color .2s; }
+  .gear:hover{ transform:rotate(45deg); border-color:var(--reagent); color:var(--text); }
+  .settoggle{ display:flex; align-items:flex-start; gap:11px; cursor:pointer; padding:6px 2px; font-size:15px; }
+  .settoggle input{ width:18px; height:18px; margin-top:2px; accent-color:var(--reagent); flex:none; cursor:pointer; }
+  .settoggle small{ display:block; color:var(--dim); font-size:12px; line-height:1.5; margin-top:3px; }
+  #author{ overflow:auto; padding:14px max(14px,env(safe-area-inset-left)) calc(16px + env(safe-area-inset-bottom)); }
+  .authwrap{ width:min(880px,100%); margin:0 auto; display:flex; flex-direction:column; gap:14px; }
+  .authtop{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .authtop .grow{ flex:1; }
+  .authtop .btn{ padding:8px 14px; font-size:11px; }
+  .authtabs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .authtabs button{ font-family:var(--mono); font-size:12px; letter-spacing:.06em; text-transform:uppercase;
+    padding:7px 13px; border-radius:999px; border:1px solid var(--glass-brd); background:rgba(255,255,255,.02);
+    color:var(--muted); cursor:pointer; transition:color .2s, border-color .2s, background .2s; }
+  .authtabs button:hover{ border-color:var(--reagent); color:var(--text); }
+  .authtabs button.on{ background:rgba(47,224,168,.12); border-color:var(--reagent); color:var(--reagent); }
+  .authhead{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .authhead h2{ margin:0; font-size:20px; letter-spacing:-.01em; }
+  .authhead .grow{ flex:1; }
+  .authlist{ display:flex; flex-direction:column; gap:8px; }
+  .authrow{ display:flex; align-items:center; gap:10px; background:var(--glass); border:1px solid var(--glass-brd);
+    border-radius:12px; padding:11px 13px; box-shadow:var(--shadow-sm); }
+  .authrow .arm{ flex:1; min-width:0; }
+  .authrow h3{ margin:0; font-size:15px; }
+  .authrow .asub{ margin:2px 0 0; font-family:var(--mono); font-size:11px; color:var(--dim); letter-spacing:.03em; }
+  .authrow .abtn{ font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; padding:5px 11px; border-radius:7px;
+    border:1px solid var(--glass-brd); background:rgba(255,255,255,.03); color:var(--muted); cursor:pointer; }
+  .authrow .abtn:hover{ border-color:var(--reagent); color:var(--text); }
+  .authrow .abtn.del:hover{ border-color:var(--hplow); color:var(--hplow); }
+  .authempty{ color:var(--dim); font-size:13px; line-height:1.5; padding:6px 2px; }
+  .authform{ display:flex; flex-direction:column; gap:9px; background:var(--glass); border:1px solid var(--glass-brd);
+    border-radius:14px; padding:16px 18px; box-shadow:var(--shadow-sm); }
+  .authform .frow{ display:flex; gap:10px; flex-wrap:wrap; }
+  .authform .frow > div{ flex:1; min-width:150px; }
+  .qeditor{ display:flex; flex-direction:column; gap:8px; }
+  .qcard{ border:1px solid var(--glass-brd); border-radius:11px; padding:10px 11px; background:rgba(10,15,24,.35); display:flex; flex-direction:column; gap:6px; }
+  .qcard .qctop{ display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; color:var(--muted); }
+  .qcard .qctop .grow{ flex:1; }
+  .qcard .qchoice{ display:flex; align-items:center; gap:8px; }
+  .qcard .qchoice input[type=radio]{ accent-color:var(--reagent); width:16px; height:16px; flex:none; }
+  .qcard .qdel, .qcard .qadd{ background:none; border:1px solid var(--glass-brd); border-radius:6px; color:var(--muted);
+    font-family:var(--mono); font-size:10px; padding:2px 8px; cursor:pointer; }
+  .qcard .qdel:hover{ color:var(--hplow); border-color:var(--hplow); }
+  .csvbox{ display:flex; flex-direction:column; gap:8px; background:var(--glass); border:1px solid var(--glass-brd);
+    border-radius:14px; padding:16px 18px; box-shadow:var(--shadow-sm); }
+  .csvbox h2{ margin:0; font-size:17px; } .csvbox p{ margin:0; font-size:12.5px; color:var(--muted); line-height:1.55; }
+  .csvbox code{ font-family:var(--mono); background:rgba(0,0,0,.3); padding:1px 5px; border-radius:4px; color:#ffe08a; font-size:11px; }
+  .csvprev{ max-height:38vh; overflow:auto; border:1px solid var(--glass-brd); border-radius:10px; }
+  .csvprev table{ width:100%; border-collapse:collapse; font-size:12px; }
+  .csvprev th,.csvprev td{ text-align:left; padding:6px 9px; border-bottom:1px solid var(--line); vertical-align:top; }
+  .csvprev th{ font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); position:sticky; top:0; background:var(--panel); }
+  .csvcount{ font-family:var(--mono); font-size:12px; } .csvcount .ok{ color:var(--reagent); } .csvcount .bad{ color:var(--hplow); }
+  .csvskip{ font-family:var(--mono); font-size:11px; color:var(--hplow); line-height:1.6; max-height:18vh; overflow:auto; }
+  .authnote{ font-size:12px; color:var(--dim); line-height:1.5; }
+
   @media (prefers-reduced-motion: reduce){
     *{ animation:none !important; transition:none !important; }
     body::after{ display:none; }        /* drop the animated background glow */
@@ -538,6 +597,7 @@
 
   <!-- ===== CHARACTER SELECT ===== -->
   <section id="select" class="screen center">
+    <button id="gearBtn" class="gear" title="settings" aria-label="settings">⚙</button>
     <div class="eyebrow">choose your student</div>
     <h1>CLINICAL QUEST<span class="sub">a nursing / teas study rpg</span></h1>
     <p class="lede">Answer to cast. Every right answer hits the enemy; every miss hits you.
@@ -548,6 +608,7 @@
       <button class="btn" id="libBtn">📚 library — read &amp; take notes</button>
       <button class="btn" id="mapBtn">🕸 mind map — your knowledge graph</button>
       <button class="btn" id="flashBtn">🃏 flashcards</button>
+      <button class="btn" id="authorBtn" style="display:none">✍ author</button>
     </div>
     <div class="roster" id="roster"></div>
     <div class="eyebrow" style="opacity:.6">↑ tap a student to battle · or study without combat</div>
@@ -751,6 +812,32 @@
       <div id="flashSummary" class="cramsummary hidden"></div>
     </div>
     <div id="flashAddModal" class="mkoverlay hidden"><div class="mkbox" id="flashAddBox"></div></div>
+  </section>
+
+  <!-- ===== SETTINGS (gates Author mode) — Phase 5 ===== -->
+  <div id="settings" class="mkoverlay hidden"><div class="mkbox">
+    <div class="mkhead">Settings <span class="mkclose" id="setClose">✕</span></div>
+    <label class="settoggle"><input type="checkbox" id="setAuthor"/>
+      <span>Author mode<small>content creation tools, CSV import &amp; JSON backup — kept out of the way until you turn it on</small></span></label>
+    <div class="mkactions"><button class="btn primary" id="setDone" type="button">done</button></div>
+  </div></div>
+
+  <!-- ===== AUTHOR MODE (Phase 5) — create content, bulk import/export ===== -->
+  <section id="author" class="screen hidden">
+    <div class="authwrap">
+      <div class="authtop">
+        <span class="chip">✍ author</span>
+        <div class="authtabs" id="authTabs">
+          <button type="button" data-tab="lessons">Lessons</button>
+          <button type="button" data-tab="questions">Questions</button>
+          <button type="button" data-tab="flashcards">Flashcards</button>
+          <button type="button" data-tab="backup">Import / Export</button>
+        </div>
+        <span class="grow"></span>
+        <button class="btn ghost" id="authQuit">back to select</button>
+      </div>
+      <div id="authorBody"></div>
+    </div>
   </section>
 
   <!-- ===== VICTORY / DEFEAT ===== -->
@@ -1071,6 +1158,7 @@ const SAVE_KEY = "clinicalQuestSave";
 function loadMeta(){
   const fresh = { unlocked:[], lastChar:null, notes:{}, lessonsDone:[], concepts:{},
                   userQuestions:[], userCards:[], manualCards:[], srs:{},
+                  userLessons:[], settings:{author:false},
                   progress:{corrects:0, wins:0, bestStreak:0, bestTier:0, bestLevel:1} };
   try{
     const m = JSON.parse(localStorage.getItem(SAVE_KEY)) || {};
@@ -1078,6 +1166,7 @@ function loadMeta(){
              notes:m.notes||{}, lessonsDone:m.lessonsDone||[], concepts:m.concepts||{},
              userQuestions:m.userQuestions||[], userCards:m.userCards||[],
              manualCards:m.manualCards||[], srs:m.srs||{},        // Phase 4: manual cards + SM-2 schedule
+             userLessons:m.userLessons||[], settings:Object.assign({author:false}, m.settings), // Phase 5: authored lessons + settings
              progress:Object.assign(fresh.progress, m.progress) };
   }catch(e){ return fresh; }
 }
@@ -1636,7 +1725,8 @@ function showLessonList(){
   $('#libReader').classList.add('hidden');
   $('#libQuiz').classList.add('hidden');
   $('#lessonList').classList.remove('hidden');
-  const pool = subjectSel==="All" ? LESSONS : LESSONS.filter(l=>l.subject===subjectSel);
+  const all = allLessons(); // Phase 5: seeded LESSONS + your authored lessons
+  const pool = subjectSel==="All" ? all : all.filter(l=>l.subject===subjectSel);
   $('#libProgress').textContent = `${pool.filter(l=>META.lessonsDone.includes(l.id)).length} / ${pool.length} complete`;
   const wrap = $('#lessonList'); wrap.innerHTML='';
   if(!pool.length){ wrap.innerHTML = `<p style="color:var(--muted); font-size:14px">No built-in lessons for this subject — switch the subject tab, add lessons to the LESSONS array, or add a PDF above.</p>`; syncPdfLibrary(); return; }
@@ -1779,6 +1869,8 @@ function buildTree(){
   // 1) concept sources = built-in CONCEPTS (copy quiz) + Phase-2 user questions
   const src = CONCEPTS.map(c=>({ id:c.id, title:c.title, subject:c.subject,
     chapter:c.chapter||c.title, lessonId:c.lessonId||null, quiz:(c.quiz||[]).slice() }));
+  (META.userLessons||[]).forEach(l=>src.push({ id:l.id, title:l.title, subject:l.subject,   // Phase 5: authored lessons → concepts
+    chapter:l.chapter||l.title, lessonId:l.id, quiz:(l.quiz||[]).slice() }));
   const byChap = {}; src.forEach(c=>{ const k=c.subject+'/'+c.chapter; if(!byChap[k]) byChap[k]=c; });
   (META.userQuestions||[]).forEach(u=>{
     const subject=u.subject, chapter=u.chapter||'My cards', k=subject+'/'+chapter;
@@ -1819,11 +1911,12 @@ function buildTree(){
   MAP.edges = [];
   TREE.chapters.forEach(ch=>MAP.edges.push([ch.parent, ch]));
   TREE.concepts.forEach(co=>MAP.edges.push([co.parent, co]));
-  TREE.sig = (META.userQuestions||[]).length+':'+CONCEPTS.length;
+  TREE.sig = treeSig();
 }
+function treeSig(){ return (META.userQuestions||[]).length+':'+(META.userLessons||[]).length+':'+CONCEPTS.length; }
 /* rebuild only when the underlying content changed; preserve expand state + positions */
 function maybeRebuildTree(){
-  const sig=(META.userQuestions||[]).length+':'+CONCEPTS.length;
+  const sig=treeSig();
   if(TREE.subjects.length && sig===TREE.sig) return;
   const prevExpanded={}, prevPos={};
   Object.values(TREE.byId).forEach(n=>{ prevExpanded[n.id]=n.expanded; prevPos[n.id]={x:n.x,y:n.y}; });
@@ -1995,7 +2088,7 @@ function openConcept(node){
   $('#mindmap').classList.add('hidden');
   $('#library').classList.remove('hidden');
   const lesson = node.lessonId
-    ? LESSONS.find(l=>l.id===node.lessonId)
+    ? allLessons().find(l=>l.id===node.lessonId)              // Phase 5: seeded or authored
     : { id:node.id, title:node.title, subject:node.subject, body:CHAPTER_PLACEHOLDER, quiz:node.quiz };
   openLesson(lesson);
 }
@@ -2884,6 +2977,348 @@ document.addEventListener('keydown', e=>{
   if(FLASH.session && FLASH.session.flipped){ const m={'1':1,'2':3,'3':4,'4':5}; if(m[e.key]!==undefined){ e.preventDefault(); gradeCard(m[e.key]); } }
 });
 refreshDueBadge();
+
+/* =====================================================================
+   11) AUTHOR MODE (Phase 5) — create content + bulk import/export. Gated
+   behind a Settings toggle. Authored content lives in the SAME localStorage
+   user-content store Phase 2/4 use (META.userLessons/userQuestions/
+   manualCards) — no duplicate store — and merges into the working set:
+   lessons → Library + mind map, questions → Cram/Battle/quizzes, cards →
+   Flashcards, all with the existing mastery + unlock tracking. No Claude API.
+   ===================================================================== */
+function allLessons(){ return LESSONS.concat(META.userLessons||[]); }   // seeded + authored
+function subjOptions(sel){ return SUBJECTS.map(s=>`<option${s===sel?' selected':''}>${escapeHtml(s)}</option>`).join(''); }
+function afterAuthorChange(){ saveMeta(); TREE.sig=null; if(typeof refreshDueBadge==='function') refreshDueBadge(); }
+
+/* ---- settings gate ---- */
+function refreshAuthorGate(){ const b=$('#authorBtn'); if(b) b.style.display=(META.settings&&META.settings.author)?'':'none'; }
+$('#gearBtn').addEventListener('click', ()=>{ $('#setAuthor').checked=!!(META.settings&&META.settings.author); $('#settings').classList.remove('hidden'); });
+$('#setClose').addEventListener('click', ()=>$('#settings').classList.add('hidden'));
+$('#setDone').addEventListener('click', ()=>$('#settings').classList.add('hidden'));
+$('#settings').addEventListener('mousedown', e=>{ if(e.target.id==='settings') $('#settings').classList.add('hidden'); });
+$('#setAuthor').addEventListener('change', e=>{ META.settings.author=e.target.checked; saveMeta(); refreshAuthorGate(); });
+
+/* ---- author screen shell ---- */
+const AUTHOR = { tab:'lessons', csvValid:null };
+function openAuthor(){ if(SFX.init) SFX.init(); $('#select').classList.add('hidden'); $('#author').classList.remove('hidden'); authorTab(AUTHOR.tab||'lessons'); }
+function quitAuthor(){ $('#author').classList.add('hidden'); buildRoster(); $('#select').classList.remove('hidden'); }
+function authorTab(name){
+  AUTHOR.tab=name;
+  $('#authTabs').querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.tab===name));
+  ({lessons:renderLessonsTab, questions:renderQuestionsTab, flashcards:renderCardsTab, backup:renderBackupTab}[name]||renderLessonsTab)();
+}
+$('#authorBtn').addEventListener('click', openAuthor);
+$('#authQuit').addEventListener('click', quitAuthor);
+$('#authTabs').addEventListener('click', e=>{ const b=e.target.closest('button[data-tab]'); if(b) authorTab(b.dataset.tab); });
+
+/* ---- LESSONS ---- */
+function renderLessonsTab(){
+  const list=META.userLessons||[];
+  $('#authorBody').innerHTML=`<div class="authhead"><h2>Lessons</h2><span class="grow"></span>
+      <button class="btn primary" id="newLesson" type="button">＋ new lesson</button></div>
+    <div class="authnote">Lessons appear in the Library and as concepts on the mind map, under their subject ▸ chapter, with the same mastery tracking as the built-in ones.</div>
+    <div class="authlist" id="authLessonList"></div>`;
+  const wrap=$('#authLessonList');
+  if(!list.length) wrap.innerHTML=`<p class="authempty">No authored lessons yet. Create one — a body plus at least one quiz question.</p>`;
+  else list.slice().reverse().forEach(l=>{
+    const row=document.createElement('div'); row.className='authrow';
+    row.innerHTML=`<div class="arm"><h3>${escapeHtml(l.title)}</h3><p class="asub">${escapeHtml(l.subject)} · ${escapeHtml(l.chapter||'—')} · ${(l.quiz||[]).length} quiz Q</p></div>
+      <button class="abtn edit" type="button">edit</button><button class="abtn del" type="button">delete</button>`;
+    row.querySelector('.edit').addEventListener('click', ()=>lessonForm(l));
+    row.querySelector('.del').addEventListener('click', ()=>{ if(confirm('Delete this lesson?')){ META.userLessons=META.userLessons.filter(x=>x.id!==l.id); META.lessonsDone=META.lessonsDone.filter(id=>id!==l.id); afterAuthorChange(); renderLessonsTab(); } });
+    wrap.appendChild(row);
+  });
+  $('#newLesson').addEventListener('click', ()=>lessonForm(null));
+}
+let QROW=0;
+function quizRow(q){
+  const rid='qr'+(QROW++); const el=document.createElement('div'); el.className='qcard';
+  el.innerHTML=`<div class="qctop"><span>question</span><span class="grow"></span><button class="qdel" type="button">remove</button></div>
+    <input class="mkin qq" placeholder="Question"/>
+    ${[0,1,2,3].map(i=>`<div class="qchoice"><input type="radio" name="${rid}" value="${i}"${(q?q.answer:0)===i?' checked':''}/><input class="mkin qc" data-i="${i}" placeholder="Choice ${String.fromCharCode(65+i)}"/></div>`).join('')}
+    <input class="mkin qwhy" placeholder="Rationale (why the answer is right)"/>`;
+  if(q){ el.querySelector('.qq').value=q.q||''; el.querySelectorAll('.qc').forEach((inp,i)=>inp.value=(q.choices&&q.choices[i])||''); el.querySelector('.qwhy').value=q.why||''; }
+  el.querySelector('.qdel').addEventListener('click', ()=>el.remove());
+  return el;
+}
+function readQuizRows(container){
+  const out=[];
+  container.querySelectorAll('.qcard').forEach(card=>{
+    const q=card.querySelector('.qq').value.trim();
+    const choices=[...card.querySelectorAll('.qc')].map(i=>i.value.trim());
+    const why=card.querySelector('.qwhy').value.trim();
+    const checked=card.querySelector('input[type=radio]:checked'); const ai=checked?+checked.value:0;
+    const compact=choices.filter(Boolean);
+    if(!q || compact.length<2 || !choices[ai]) return;   // skip incomplete rows
+    const answer=compact.indexOf(choices[ai]);
+    out.push({ q, choices:compact, answer:answer<0?0:answer, why });
+  });
+  return out;
+}
+function lessonForm(ex){
+  const l=ex||{ title:'', subject:SUBJECTS[0], chapter:'', body:'', quiz:[] };
+  $('#authorBody').innerHTML=`<div class="authhead"><h2>${ex?'Edit':'New'} lesson</h2></div>
+    <div class="authform">
+      <div class="frow"><div><label class="mklab">Title</label><input id="alTitle" class="mkin"/></div></div>
+      <div class="frow"><div><label class="mklab">Subject</label><select id="alSubject" class="mkin">${subjOptions(l.subject)}</select></div>
+        <div><label class="mklab">Chapter</label><input id="alChapter" class="mkin" placeholder="e.g. Renal"/></div></div>
+      <label class="mklab">Body — a blank line starts a new paragraph</label>
+      <textarea id="alBody" class="mkin" rows="8"></textarea>
+      <label class="mklab">Quiz questions — ≥1, tap ◯ for the correct choice</label>
+      <div class="qeditor" id="alQuiz"></div>
+      <button class="qadd" id="alAddQ" type="button">＋ add question</button>
+      <div class="mkerr" id="alErr"></div>
+      <div class="mkactions"><button class="btn primary" id="alSave" type="button">save lesson</button>
+        <button class="btn ghost" id="alCancel" type="button">cancel</button></div>
+    </div>`;
+  $('#alTitle').value=l.title; $('#alChapter').value=l.chapter||''; $('#alBody').value=l.body||'';
+  const qwrap=$('#alQuiz'); (l.quiz&&l.quiz.length?l.quiz:[null]).forEach(q=>qwrap.appendChild(quizRow(q)));
+  $('#alAddQ').addEventListener('click', ()=>qwrap.appendChild(quizRow(null)));
+  $('#alCancel').addEventListener('click', renderLessonsTab);
+  $('#alSave').addEventListener('click', ()=>saveLesson(ex));
+}
+function saveLesson(ex){
+  const title=$('#alTitle').value.trim(), subject=$('#alSubject').value, chapter=$('#alChapter').value.trim(), bodyText=$('#alBody').value.trim();
+  const quiz=readQuizRows($('#alQuiz')), err=$('#alErr');
+  if(!title){ err.textContent='Add a title.'; return; }
+  if(!bodyText){ err.textContent='Add some body text.'; return; }
+  if(!quiz.length){ err.textContent='Add at least one complete quiz question (question + 2 choices + a marked answer).'; return; }
+  if(ex){ ex.title=title; ex.subject=subject; ex.chapter=chapter||'General'; ex.body=bodyText; ex.quiz=quiz; }
+  else META.userLessons.push({ id:uid('ul-'), title, subject, chapter:chapter||'General', body:bodyText, quiz, createdAt:Date.now() });
+  afterAuthorChange(); showToast('✓ lesson saved'); renderLessonsTab();
+}
+
+/* ---- QUESTIONS (standalone; authored ones have no pdfId) ---- */
+function authoredQuestions(){ return (META.userQuestions||[]).filter(q=>!q.pdfId); }
+function renderQuestionsTab(){
+  $('#authorBody').innerHTML=`<div class="authhead"><h2>Questions</h2><span class="grow"></span>
+      <button class="btn primary" id="newQ" type="button">＋ new question</button></div>
+    <div class="authnote">Standalone questions flow into Cram, Battle, and the subject/chapter quizzes. (Questions made from PDF highlights are managed in the PDF reader.)</div>
+    <div class="authlist" id="authQList"></div>`;
+  const wrap=$('#authQList'), list=authoredQuestions();
+  if(!list.length) wrap.innerHTML=`<p class="authempty">No authored questions yet.</p>`;
+  else list.slice().reverse().forEach(q=>{
+    const row=document.createElement('div'); row.className='authrow';
+    row.innerHTML=`<div class="arm"><h3>${escapeHtml(q.q.slice(0,80))}</h3><p class="asub">${escapeHtml(q.subject)} · ${escapeHtml(q.chapter||'—')} · ✓ ${escapeHtml((q.choices[q.answer]||'').slice(0,40))}</p></div>
+      <button class="abtn edit" type="button">edit</button><button class="abtn del" type="button">delete</button>`;
+    row.querySelector('.edit').addEventListener('click', ()=>questionForm(q));
+    row.querySelector('.del').addEventListener('click', ()=>{ if(confirm('Delete this question?')){ META.userQuestions=META.userQuestions.filter(x=>x.id!==q.id); afterAuthorChange(); renderQuestionsTab(); } });
+    wrap.appendChild(row);
+  });
+  $('#newQ').addEventListener('click', ()=>questionForm(null));
+}
+function questionForm(ex){
+  const q=ex||{ subject:SUBJECTS[0], chapter:'', q:'', choices:['','','',''], answer:0, why:'' };
+  $('#authorBody').innerHTML=`<div class="authhead"><h2>${ex?'Edit':'New'} question</h2></div>
+    <div class="authform">
+      <div class="frow"><div><label class="mklab">Subject</label><select id="aqSubject" class="mkin">${subjOptions(q.subject)}</select></div>
+        <div><label class="mklab">Chapter</label><input id="aqChapter" class="mkin" placeholder="e.g. Renal"/></div></div>
+      <label class="mklab">Question</label><textarea id="aqQ" class="mkin" rows="2"></textarea>
+      <label class="mklab">Choices — tap ◯ for the correct one</label><div id="aqChoices"></div>
+      <label class="mklab">Rationale</label><input id="aqWhy" class="mkin"/>
+      <div class="mkerr" id="aqErr"></div>
+      <div class="mkactions"><button class="btn primary" id="aqSave" type="button">save question</button>
+        <button class="btn ghost" id="aqCancel" type="button">cancel</button></div>
+    </div>`;
+  $('#aqChapter').value=q.chapter||''; $('#aqQ').value=q.q||''; $('#aqWhy').value=q.why||'';
+  const cw=$('#aqChoices');
+  [0,1,2,3].forEach(i=>{ const row=document.createElement('div'); row.className='qchoice';
+    row.innerHTML=`<input type="radio" name="aqAns" value="${i}"${q.answer===i?' checked':''}/><input class="mkin aqc" placeholder="Choice ${String.fromCharCode(65+i)}"/>`; cw.appendChild(row); });
+  cw.querySelectorAll('.aqc').forEach((inp,i)=>inp.value=(q.choices&&q.choices[i])||'');
+  $('#aqCancel').addEventListener('click', renderQuestionsTab);
+  $('#aqSave').addEventListener('click', ()=>saveQuestionAuthored(ex));
+}
+function saveQuestionAuthored(ex){
+  const subject=$('#aqSubject').value, chapter=$('#aqChapter').value.trim(), qq=$('#aqQ').value.trim(), why=$('#aqWhy').value.trim();
+  const choices=[...$('#aqChoices').querySelectorAll('.aqc')].map(i=>i.value.trim());
+  const checked=$('#aqChoices').querySelector('input[type=radio]:checked'); const ai=checked?+checked.value:0;
+  const err=$('#aqErr'), compact=choices.filter(Boolean);
+  if(!qq){ err.textContent='Add a question.'; return; }
+  if(compact.length<2){ err.textContent='Add at least two choices.'; return; }
+  if(!choices[ai]){ err.textContent='The marked choice is empty.'; return; }
+  const answer=compact.indexOf(choices[ai]);
+  if(ex){ ex.subject=subject; ex.chapter=chapter||'Imported'; ex.q=qq; ex.choices=compact; ex.answer=answer<0?0:answer; ex.why=why; }
+  else META.userQuestions.push({ id:uid('uq-'), subject, chapter:chapter||'Imported', q:qq, choices:compact, answer:answer<0?0:answer, why, createdAt:Date.now() });
+  afterAuthorChange(); showToast('✓ question saved'); renderQuestionsTab();
+}
+
+/* ---- FLASHCARDS (reuse Phase-4 manualCards) ---- */
+function renderCardsTab(){
+  const list=META.manualCards||[];
+  $('#authorBody').innerHTML=`<div class="authhead"><h2>Flashcards</h2><span class="grow"></span>
+      <button class="btn primary" id="newCard" type="button">＋ new flashcard</button></div>
+    <div class="authnote">These join Flashcards mode (Manual deck + their subject/chapter decks) with SM-2 scheduling.</div>
+    <div class="authlist" id="authCardList"></div>`;
+  const wrap=$('#authCardList');
+  if(!list.length) wrap.innerHTML=`<p class="authempty">No manual flashcards yet.</p>`;
+  else list.slice().reverse().forEach(c=>{
+    const row=document.createElement('div'); row.className='authrow';
+    row.innerHTML=`<div class="arm"><h3>${escapeHtml(c.front.slice(0,70))}</h3><p class="asub">${escapeHtml(c.subject||'—')} · ${escapeHtml(c.chapter||'—')} · ${escapeHtml(c.back.slice(0,50))}</p></div>
+      <button class="abtn edit" type="button">edit</button><button class="abtn del" type="button">delete</button>`;
+    row.querySelector('.edit').addEventListener('click', ()=>cardForm(c));
+    row.querySelector('.del').addEventListener('click', ()=>{ if(confirm('Delete this flashcard?')){ META.manualCards=META.manualCards.filter(x=>x.id!==c.id); afterAuthorChange(); renderCardsTab(); } });
+    wrap.appendChild(row);
+  });
+  $('#newCard').addEventListener('click', ()=>cardForm(null));
+}
+function cardForm(ex){
+  const c=ex||{ front:'', back:'', subject:SUBJECTS[0], chapter:'' };
+  $('#authorBody').innerHTML=`<div class="authhead"><h2>${ex?'Edit':'New'} flashcard</h2></div>
+    <div class="authform">
+      <label class="mklab">Front — term / question</label><textarea id="acFront" class="mkin" rows="2"></textarea>
+      <label class="mklab">Back — answer / definition</label><textarea id="acBack" class="mkin" rows="3"></textarea>
+      <div class="frow"><div><label class="mklab">Subject</label><select id="acSubject" class="mkin">${subjOptions(c.subject)}</select></div>
+        <div><label class="mklab">Chapter (optional)</label><input id="acChapter" class="mkin"/></div></div>
+      <div class="mkerr" id="acErr"></div>
+      <div class="mkactions"><button class="btn primary" id="acSave" type="button">save flashcard</button>
+        <button class="btn ghost" id="acCancel" type="button">cancel</button></div>
+    </div>`;
+  $('#acFront').value=c.front||''; $('#acBack').value=c.back||''; $('#acChapter').value=c.chapter||'';
+  $('#acCancel').addEventListener('click', renderCardsTab);
+  $('#acSave').addEventListener('click', ()=>saveCardAuthored(ex));
+}
+function saveCardAuthored(ex){
+  const front=$('#acFront').value.trim(), back=$('#acBack').value.trim(), subject=$('#acSubject').value, chapter=$('#acChapter').value.trim()||null;
+  const err=$('#acErr');
+  if(!front||!back){ err.textContent='Fill in both front and back.'; return; }
+  if(ex){ ex.front=front; ex.back=back; ex.subject=subject; ex.chapter=chapter; }
+  else META.manualCards.push({ id:uid('mc-'), front, back, subject, chapter, createdAt:Date.now() });
+  afterAuthorChange(); showToast('✓ flashcard saved'); renderCardsTab();
+}
+
+/* ---- BACKUP: CSV import + JSON export/import ---- */
+function parseCSV(text){
+  const rows=[]; let row=[], field='', i=0, q=false;
+  while(i<text.length){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){ field+='"'; i++; } else q=false; } else field+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(field); field=''; }
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(field); rows.push(row); row=[]; field=''; }
+    else field+=c;
+    i++;
+  }
+  if(field.length||row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r=>r.some(x=>(x||'').trim()!==''));
+}
+function validateCsv(rows){
+  let start=0;
+  if(rows[0] && /subject/i.test(rows[0][0]||'') && /question/i.test(rows[0][2]||'')) start=1;
+  const valid=[], skipped=[];
+  for(let r=start;r<rows.length;r++){
+    const cols=rows[r].map(x=>(x==null?'':x.trim())), rowNo=r+1;
+    const [subject,chapter,question,cA,cB,cC,cD,ansIdx,rationale]=cols;
+    if(cols.length<8){ skipped.push({row:rowNo, reason:`only ${cols.length} columns (need ≥8)`}); continue; }
+    if(!subject){ skipped.push({row:rowNo, reason:'missing subject'}); continue; }
+    if(!question){ skipped.push({row:rowNo, reason:'missing question'}); continue; }
+    const all=[cA,cB,cC,cD], compact=all.filter(x=>x!=='');
+    if(compact.length<2){ skipped.push({row:rowNo, reason:'fewer than 2 choices'}); continue; }
+    const ai=parseInt(ansIdx,10);
+    if(isNaN(ai)||ai<0||ai>3){ skipped.push({row:rowNo, reason:`answerIndex "${ansIdx}" is not 0–3`}); continue; }
+    if(!all[ai]){ skipped.push({row:rowNo, reason:`answerIndex ${ai} points at an empty choice`}); continue; }
+    valid.push({ subject, chapter:chapter||'Imported', q:question, choices:compact, answer:compact.indexOf(all[ai]), why:rationale||'' });
+  }
+  return { valid, skipped, headerSkipped:start===1 };
+}
+function commitCsv(valid){
+  valid.forEach(v=>META.userQuestions.push({ id:uid('uq-'), subject:v.subject, chapter:v.chapter, q:v.q, choices:v.choices, answer:v.answer, why:v.why, createdAt:Date.now() }));
+  afterAuthorChange();
+}
+function renderBackupTab(){
+  $('#authorBody').innerHTML=`
+    <div class="csvbox">
+      <h2>Bulk import questions (CSV)</h2>
+      <p>Columns: <code>subject, chapter, question, choiceA, choiceB, choiceC, choiceD, answerIndex, rationale</code>.
+         answerIndex is 0-based (<code>0</code>=A … <code>3</code>=D). A header row is optional.</p>
+      <input type="file" id="csvFile" accept=".csv,text/csv"/>
+      <textarea id="csvText" class="mkin" rows="5" placeholder="…or paste CSV rows here"></textarea>
+      <div class="mkactions"><button class="btn" id="csvPreview" type="button">preview</button></div>
+      <div id="csvOut"></div>
+    </div>
+    <div class="csvbox">
+      <h2>Backup — export / import everything</h2>
+      <p>One JSON file with your authored lessons, questions &amp; flashcards, SM-2 schedules, mastery, plus your PDF highlights &amp; notes. (PDF files themselves aren’t included — re-add them on the other device.)</p>
+      <div class="mkactions">
+        <button class="btn primary" id="expAll" type="button">⬇ export all (JSON)</button>
+        <input type="file" id="impFile" accept=".json,application/json" style="display:none"/>
+        <button class="btn" id="impBtn" type="button">⬆ import backup</button>
+      </div>
+      <div id="impOut" class="authnote"></div>
+    </div>`;
+  $('#csvFile').addEventListener('change', async e=>{ const f=e.target.files[0]; if(f) $('#csvText').value=await f.text(); });
+  $('#csvPreview').addEventListener('click', previewCsv);
+  $('#expAll').addEventListener('click', exportAllJson);
+  $('#impBtn').addEventListener('click', ()=>$('#impFile').click());
+  $('#impFile').addEventListener('change', importBackupFile);
+}
+function previewCsv(){
+  const text=$('#csvText').value, out=$('#csvOut');
+  if(!text.trim()){ out.innerHTML=`<p class="authempty">Paste CSV or choose a file first.</p>`; return; }
+  const { valid, skipped, headerSkipped }=validateCsv(parseCSV(text));
+  AUTHOR.csvValid=valid;
+  let html=`<div class="csvcount"><span class="ok">${valid.length} ready to import</span> · <span class="bad">${skipped.length} skipped</span>${headerSkipped?' · header row detected':''}</div>`;
+  if(valid.length){
+    html+=`<div class="csvprev"><table><thead><tr><th>subject</th><th>chapter</th><th>question</th><th>✓ answer</th></tr></thead><tbody>`
+      + valid.slice(0,50).map(v=>`<tr><td>${escapeHtml(v.subject)}</td><td>${escapeHtml(v.chapter)}</td><td>${escapeHtml(v.q.slice(0,70))}</td><td>${escapeHtml((v.choices[v.answer]||'').slice(0,30))}</td></tr>`).join('')
+      + `</tbody></table></div>`+(valid.length>50?`<div class="authnote">…and ${valid.length-50} more</div>`:'');
+  }
+  if(skipped.length) html+=`<div class="csvskip">${skipped.map(s=>`row ${s.row}: ${escapeHtml(s.reason)}`).join('<br>')}</div>`;
+  if(valid.length) html+=`<div class="mkactions"><button class="btn primary" id="csvCommit" type="button">import ${valid.length} question${valid.length===1?'':'s'}</button></div>`;
+  out.innerHTML=html;
+  const cc=$('#csvCommit'); if(cc) cc.addEventListener('click', ()=>{
+    const n=(AUTHOR.csvValid||[]).length; commitCsv(AUTHOR.csvValid||[]);
+    out.innerHTML=`<div class="csvcount"><span class="ok">✓ imported ${n}</span> — now in Cram, Battle &amp; the quizzes.</div>`;
+    $('#csvText').value=''; showToast(`✓ imported ${n} question${n===1?'':'s'}`);
+  });
+}
+function downloadJson(data, name){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+async function exportAllJson(){
+  let pdfs=[];
+  try{ if(await PDFDB.available()){
+    const recs=await PDFDB.getAll('pdfs')||[], hls=await PDFDB.getAll('highlights')||[];
+    const by={}; hls.forEach(h=>(by[h.pdfId]=by[h.pdfId]||[]).push(hlClean(h)));
+    pdfs=recs.map(r=>({ id:r.id, name:r.name, subject:r.subject||null, chapter:r.chapter||null, note:r.note||'', addedAt:r.addedAt, highlights:by[r.id]||[] }));
+  }}catch(e){}
+  downloadJson({ app:'clinical-quest', kind:'backup', version:5, exportedAt:new Date().toISOString(),
+    userLessons:META.userLessons||[], userQuestions:META.userQuestions||[], userCards:META.userCards||[], manualCards:META.manualCards||[],
+    srs:META.srs||{}, concepts:META.concepts||{}, lessonsDone:META.lessonsDone||[], notes:META.notes||{}, progress:META.progress||{},
+    pdfs }, 'clinical-quest-backup.json');
+  showToast('✓ backup exported');
+}
+async function importJson(obj){
+  if(!obj || typeof obj!=='object') throw 'not a backup file';
+  const mergeArr=key=>{ if(!Array.isArray(obj[key])) return 0; const cur=META[key]||(META[key]=[]);
+    const ids=new Set(cur.map(x=>x&&x.id)); let n=0;
+    obj[key].forEach(it=>{ if(it&&it.id&&!ids.has(it.id)){ cur.push(it); ids.add(it.id); n++; } }); return n; };
+  const counts={ userLessons:mergeArr('userLessons'), userQuestions:mergeArr('userQuestions'), userCards:mergeArr('userCards'), manualCards:mergeArr('manualCards') };
+  if(obj.srs&&typeof obj.srs==='object') Object.assign(META.srs, obj.srs);
+  if(obj.concepts&&typeof obj.concepts==='object') Object.assign(META.concepts, obj.concepts);
+  if(obj.notes&&typeof obj.notes==='object') Object.assign(META.notes, obj.notes);
+  if(Array.isArray(obj.lessonsDone)) obj.lessonsDone.forEach(id=>{ if(!META.lessonsDone.includes(id)) META.lessonsDone.push(id); });
+  let hlCount=0;
+  if(Array.isArray(obj.pdfs)){ try{ if(await PDFDB.available()){
+    for(const p of obj.pdfs){ const rec=await PDFDB.get('pdfs', p.id);
+      if(rec){ if(p.note) rec.note=p.note; if(p.subject) rec.subject=p.subject; if(p.chapter) rec.chapter=p.chapter; await PDFDB.put('pdfs', rec); }
+      if(Array.isArray(p.highlights)) for(const h of p.highlights){ if(h&&h.id&&h.pdfId){ await PDFDB.put('highlights', h); hlCount++; } }
+    }
+  }}catch(e){} }
+  afterAuthorChange();
+  return { counts, hlCount };
+}
+async function importBackupFile(e){
+  const f=e.target.files[0]; if(!f) return; e.target.value='';
+  const out=$('#impOut'); let obj;
+  try{ obj=JSON.parse(await f.text()); }catch(err){ out.innerHTML=`<span style="color:var(--hplow)">Couldn’t parse that JSON file.</span>`; return; }
+  try{ const r=await importJson(obj), c=r.counts;
+    out.innerHTML=`✓ imported — <b>${c.userLessons}</b> lessons, <b>${c.userQuestions}</b> questions, <b>${c.userCards+c.manualCards}</b> flashcards, <b>${r.hlCount}</b> highlights (merged, duplicates skipped). Reopen a mode to see them.`;
+    showToast('✓ backup imported');
+  }catch(err){ out.innerHTML=`<span style="color:var(--hplow)">Import failed: ${escapeHtml(String(err))}</span>`; }
+}
+
+refreshAuthorGate();
 
 /* =====================================================================
    ROADMAP HOOKS for Claude Code (build these next, in your repo):
