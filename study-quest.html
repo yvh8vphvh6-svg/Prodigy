@@ -595,6 +595,14 @@
   .hudquit:active{ transform:scale(.97); }
   .hudquit:focus-visible{ outline:3px solid var(--hplow); outline-offset:2px; }
 
+  /* ---------- question / card images ---------- */
+  .qimg{ display:block; max-height:40vh; max-width:100%; margin:0 auto 10px; border-radius:10px;
+    object-fit:contain; border:1px solid var(--glass-brd); background:#0b1019; }
+  .qimg-wrap{ display:flex; justify-content:center; }
+  .deckface .qimg{ max-height:24vh; margin-bottom:8px; }
+  .qimgrow{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .qimgthumb{ max-height:64px; max-width:110px; border-radius:8px; border:1px solid var(--glass-brd); object-fit:cover; background:#0b1019; }
+
   @media (prefers-reduced-motion: reduce){
     *{ animation:none !important; transition:none !important; }
     body::after{ display:none; }        /* drop the animated background glow */
@@ -661,6 +669,7 @@
         <span class="element" id="element" style="--el:var(--reagent)">—</span>
         <div class="qtimer" id="qtimer"><i id="qtimerFill"></i></div>
       </div>
+      <div class="qimg-wrap" id="qImg" style="display:none"></div>
       <div class="q" id="qText">—</div>
       <div class="choices" id="choices"></div>
       <div class="rationale" id="rationale"></div>
@@ -680,6 +689,7 @@
       </div>
       <div class="qpanel" id="cramQPanel">
         <div class="qtop"><span class="element" id="cramElement" style="--el:var(--reagent)">—</span></div>
+        <div class="qimg-wrap" id="cramImg" style="display:none"></div>
         <div class="q" id="cramQText">—</div>
         <div class="choices" id="cramChoices"></div>
         <div class="rationale" id="cramRationale"></div>
@@ -726,6 +736,7 @@
         <div class="qpanel" id="libQPanel" style="border:1px solid var(--line2); border-radius:14px">
           <div class="qtop"><span class="element" id="libElement" style="--el:var(--reagent)">—</span>
             <span class="chip" id="libQCount" style="margin-left:auto">1 / 1</span></div>
+          <div class="qimg-wrap" id="libImg" style="display:none"></div>
           <div class="q" id="libQText">—</div>
           <div class="choices" id="libChoices"></div>
           <div class="rationale" id="libRationale"></div>
@@ -1427,6 +1438,7 @@ function loadQuestion(){
   const el = ELEMENTS[q.subject] || ELEMENTS["A&P"];
   const elBadge = $('#element');
   elBadge.textContent = el.spell; elBadge.style.setProperty('--el', el.css);
+  showQImage('#qImg', q.img, q.q);
   $('#qText').textContent = q.q;
   const wrap = $('#choices'); wrap.innerHTML='';
   const keys=['A','B','C','D'];
@@ -1648,6 +1660,7 @@ function loadCramQ(){
   const el = ELEMENTS[q.subject] || ELEMENTS["A&P"];
   const badge = $('#cramElement');
   badge.textContent = `${q.subject} · ${q.chapter}`; badge.style.setProperty('--el', el.css);
+  showQImage('#cramImg', q.img, q.q);
   $('#cramQText').textContent = q.q;
   const wrap = $('#cramChoices'); wrap.innerHTML='';
   const keys=['A','B','C','D'];
@@ -1791,6 +1804,7 @@ function loadLibQ(){
   const el = ELEMENTS[l.subject] || ELEMENTS["A&P"];
   const badge=$('#libElement'); badge.textContent=`${l.subject} · quiz`; badge.style.setProperty('--el', el.css);
   $('#libQCount').textContent = `${LIB.qi+1} / ${l.quiz.length}`;
+  showQImage('#libImg', q.img, q.q);
   $('#libQText').textContent = q.q;
   const wrap=$('#libChoices'); wrap.innerHTML='';
   const keys=['A','B','C','D'];
@@ -2215,7 +2229,7 @@ const PDFDB = (()=>{
   function open(){
     if(dbp) return dbp;
     dbp = new Promise((res,rej)=>{
-      let req; try{ req = indexedDB.open('clinicalQuestPDF', 1); }
+      let req; try{ req = indexedDB.open('clinicalQuestPDF', 2); }   // v2 adds the 'images' store (Phase 6)
       catch(e){ rej(e); return; }
       req.onupgradeneeded = ()=>{
         const db=req.result;
@@ -2224,6 +2238,7 @@ const PDFDB = (()=>{
           const s=db.createObjectStore('highlights',{keyPath:'id'});
           s.createIndex('pdfId','pdfId',{unique:false});
         }
+        if(!db.objectStoreNames.contains('images')) db.createObjectStore('images',{keyPath:'id'}); // large question images
       };
       req.onsuccess = ()=>res(req.result);
       req.onerror   = ()=>rej(req.error||new Error('idb open failed'));
@@ -2790,12 +2805,12 @@ function refreshDueBadge(){ const b=$('#flashBtn'); if(!b) return; const n=dueCo
 function buildAllCards(pdfMap){
   const cards=[];
   QUESTION_BANK.forEach((qq,i)=>cards.push({ id:'qb:'+i, source:'bank', subject:qq.subject, chapter:qq.chapter,
-    front:qq.q, back:'✓ '+qq.choices[qq.answer]+(qq.why?('\n\n'+qq.why):'') }));
+    front:qq.q, back:'✓ '+qq.choices[qq.answer]+(qq.why?('\n\n'+qq.why):''), img:qq.img }));
   (META.userCards||[]).forEach(c=>{ const p=(pdfMap||{})[c.pdfId]||{};
     cards.push({ id:'uc:'+c.id, source:'pdf', subject:p.subject||null, chapter:p.chapter||null,
-      pdfId:c.pdfId, pdfName:p.name||'PDF', front:c.front, back:c.back }); });
+      pdfId:c.pdfId, pdfName:p.name||'PDF', front:c.front, back:c.back, img:c.img }); });
   (META.manualCards||[]).forEach(c=>cards.push({ id:'mc:'+c.id, source:'manual', subject:c.subject||null,
-    chapter:c.chapter||null, front:c.front, back:c.back }));
+    chapter:c.chapter||null, front:c.front, back:c.back, img:c.img }));
   return cards;
 }
 function subjectsPresent(cards){
@@ -2907,7 +2922,7 @@ function showCard(){
   s.flipped=false;
   $('#flashProg').textContent=`${Math.min(s.i+1, s.queue.length)} / ${s.queue.length}`;
   $('#flashCard').className='deckcard';
-  $('#flashFront').textContent=card.front;
+  renderCardFace($('#flashFront'), card.img, card.front);   // image (if any) above the prompt
   $('#flashBack').textContent=card.back;
   $('#flashHint').textContent='tap the card to flip';
   $('#flashGrades').style.visibility='hidden';
@@ -3130,6 +3145,14 @@ function questionForm(ex){
       <label class="mklab">Question</label><textarea id="aqQ" class="mkin" rows="2"></textarea>
       <label class="mklab">Choices — tap ◯ for the correct one</label><div id="aqChoices"></div>
       <label class="mklab">Rationale</label><input id="aqWhy" class="mkin"/>
+      <label class="mklab">Image (optional) — shown above the question everywhere it appears</label>
+      <div class="qimgrow">
+        <input type="file" id="aqImgFile" accept="image/*" hidden/>
+        <button class="btn" id="aqImgBtn" type="button">add image</button>
+        <button class="btn ghost" id="aqImgRemove" type="button" style="display:none">remove</button>
+        <img id="aqImgThumb" class="qimgthumb" alt="image preview" style="display:none"/>
+      </div>
+      <div class="authnote" id="aqImgNote"></div>
       <div class="mkerr" id="aqErr"></div>
       <div class="mkactions"><button class="btn primary" id="aqSave" type="button">save question</button>
         <button class="btn ghost" id="aqCancel" type="button">cancel</button></div>
@@ -3139,8 +3162,25 @@ function questionForm(ex){
   [0,1,2,3].forEach(i=>{ const row=document.createElement('div'); row.className='qchoice';
     row.innerHTML=`<input type="radio" name="aqAns" value="${i}"${q.answer===i?' checked':''}/><input class="mkin aqc" placeholder="Choice ${String.fromCharCode(65+i)}"/>`; cw.appendChild(row); });
   cw.querySelectorAll('.aqc').forEach((inp,i)=>inp.value=(q.choices&&q.choices[i])||'');
+  AUTHOR.qImg = (ex && ex.img) || null;   // draft image for this question
+  $('#aqImgBtn').addEventListener('click', ()=>$('#aqImgFile').click());
+  $('#aqImgFile').addEventListener('change', async e=>{
+    const f=e.target.files[0]; e.target.value=''; if(!f) return;
+    $('#aqImgNote').textContent='adding…';
+    const r=await attachQuestionImage(f);
+    if(r.err){ $('#aqImgNote').textContent=r.err; return; }
+    AUTHOR.qImg=r.img; $('#aqImgNote').textContent=r.note||''; renderQImgPreview();
+  });
+  $('#aqImgRemove').addEventListener('click', ()=>{ AUTHOR.qImg=null; $('#aqImgNote').textContent=''; renderQImgPreview(); });
+  renderQImgPreview();
   $('#aqCancel').addEventListener('click', renderQuestionsTab);
   $('#aqSave').addEventListener('click', ()=>saveQuestionAuthored(ex));
+}
+function renderQImgPreview(){
+  const thumb=$('#aqImgThumb'), rm=$('#aqImgRemove'); if(!thumb) return;
+  if(AUTHOR.qImg){ rm.style.display=''; thumb.style.display='';
+    resolveImgSrc(AUTHOR.qImg).then(s=>{ if(s) thumb.src=s; }); }
+  else { rm.style.display='none'; thumb.style.display='none'; thumb.removeAttribute('src'); }
 }
 function saveQuestionAuthored(ex){
   const subject=$('#aqSubject').value, chapter=$('#aqChapter').value.trim(), qq=$('#aqQ').value.trim(), why=$('#aqWhy').value.trim();
@@ -3151,8 +3191,10 @@ function saveQuestionAuthored(ex){
   if(compact.length<2){ err.textContent='Add at least two choices.'; return; }
   if(!choices[ai]){ err.textContent='The marked choice is empty.'; return; }
   const answer=compact.indexOf(choices[ai]);
-  if(ex){ ex.subject=subject; ex.chapter=chapter||'Imported'; ex.q=qq; ex.choices=compact; ex.answer=answer<0?0:answer; ex.why=why; }
-  else META.userQuestions.push({ id:uid('uq-'), subject, chapter:chapter||'Imported', q:qq, choices:compact, answer:answer<0?0:answer, why, createdAt:Date.now() });
+  if(ex){ ex.subject=subject; ex.chapter=chapter||'Imported'; ex.q=qq; ex.choices=compact; ex.answer=answer<0?0:answer; ex.why=why;
+          if(AUTHOR.qImg) ex.img=AUTHOR.qImg; else delete ex.img; }
+  else { const rec={ id:uid('uq-'), subject, chapter:chapter||'Imported', q:qq, choices:compact, answer:answer<0?0:answer, why, createdAt:Date.now() };
+         if(AUTHOR.qImg) rec.img=AUTHOR.qImg; META.userQuestions.push(rec); }
   afterAuthorChange(); showToast('✓ question saved'); renderQuestionsTab();
 }
 
@@ -3220,7 +3262,7 @@ function validateCsv(rows){
   const valid=[], skipped=[];
   for(let r=start;r<rows.length;r++){
     const cols=rows[r].map(x=>(x==null?'':x.trim())), rowNo=r+1;
-    const [subject,chapter,question,cA,cB,cC,cD,ansIdx,rationale]=cols;
+    const [subject,chapter,question,cA,cB,cC,cD,ansIdx,rationale,image]=cols;  // image = optional 10th column
     if(cols.length<8){ skipped.push({row:rowNo, reason:`only ${cols.length} columns (need ≥8)`}); continue; }
     if(!subject){ skipped.push({row:rowNo, reason:'missing subject'}); continue; }
     if(!question){ skipped.push({row:rowNo, reason:'missing question'}); continue; }
@@ -3229,20 +3271,24 @@ function validateCsv(rows){
     const ai=parseInt(ansIdx,10);
     if(isNaN(ai)||ai<0||ai>3){ skipped.push({row:rowNo, reason:`answerIndex "${ansIdx}" is not 0–3`}); continue; }
     if(!all[ai]){ skipped.push({row:rowNo, reason:`answerIndex ${ai} points at an empty choice`}); continue; }
-    valid.push({ subject, chapter:chapter||'Imported', q:question, choices:compact, answer:compact.indexOf(all[ai]), why:rationale||'' });
+    const rec={ subject, chapter:chapter||'Imported', q:question, choices:compact, answer:compact.indexOf(all[ai]), why:rationale||'' };
+    if(image) rec.img=image;   // a URL; only present in 10-column CSVs
+    valid.push(rec);
   }
   return { valid, skipped, headerSkipped:start===1 };
 }
 function commitCsv(valid){
-  valid.forEach(v=>META.userQuestions.push({ id:uid('uq-'), subject:v.subject, chapter:v.chapter, q:v.q, choices:v.choices, answer:v.answer, why:v.why, createdAt:Date.now() }));
+  valid.forEach(v=>{ const rec={ id:uid('uq-'), subject:v.subject, chapter:v.chapter, q:v.q, choices:v.choices, answer:v.answer, why:v.why, createdAt:Date.now() };
+    if(v.img) rec.img=v.img; META.userQuestions.push(rec); });
   afterAuthorChange();
 }
 function renderBackupTab(){
   $('#authorBody').innerHTML=`
     <div class="csvbox">
       <h2>Bulk import questions (CSV)</h2>
-      <p>Columns: <code>subject, chapter, question, choiceA, choiceB, choiceC, choiceD, answerIndex, rationale</code>.
-         answerIndex is 0-based (<code>0</code>=A … <code>3</code>=D). A header row is optional.</p>
+      <p>Columns: <code>subject, chapter, question, choiceA, choiceB, choiceC, choiceD, answerIndex, rationale</code>,
+         plus an optional 10th <code>image</code> (a URL). answerIndex is 0-based (<code>0</code>=A … <code>3</code>=D).
+         A header row is optional; 9-column files still work.</p>
       <input type="file" id="csvFile" accept=".csv,text/csv"/>
       <textarea id="csvText" class="mkin" rows="5" placeholder="…or paste CSV rows here"></textarea>
       <div class="mkactions"><button class="btn" id="csvPreview" type="button">preview</button></div>
@@ -3271,8 +3317,8 @@ function previewCsv(){
   AUTHOR.csvValid=valid;
   let html=`<div class="csvcount"><span class="ok">${valid.length} ready to import</span> · <span class="bad">${skipped.length} skipped</span>${headerSkipped?' · header row detected':''}</div>`;
   if(valid.length){
-    html+=`<div class="csvprev"><table><thead><tr><th>subject</th><th>chapter</th><th>question</th><th>✓ answer</th></tr></thead><tbody>`
-      + valid.slice(0,50).map(v=>`<tr><td>${escapeHtml(v.subject)}</td><td>${escapeHtml(v.chapter)}</td><td>${escapeHtml(v.q.slice(0,70))}</td><td>${escapeHtml((v.choices[v.answer]||'').slice(0,30))}</td></tr>`).join('')
+    html+=`<div class="csvprev"><table><thead><tr><th>subject</th><th>chapter</th><th>question</th><th>✓ answer</th><th>img</th></tr></thead><tbody>`
+      + valid.slice(0,50).map(v=>`<tr><td>${escapeHtml(v.subject)}</td><td>${escapeHtml(v.chapter)}</td><td>${escapeHtml(v.q.slice(0,70))}</td><td>${escapeHtml((v.choices[v.answer]||'').slice(0,30))}</td><td>${v.img?'🖼':''}</td></tr>`).join('')
       + `</tbody></table></div>`+(valid.length>50?`<div class="authnote">…and ${valid.length-50} more</div>`:'');
   }
   if(skipped.length) html+=`<div class="csvskip">${skipped.map(s=>`row ${s.row}: ${escapeHtml(s.reason)}`).join('<br>')}</div>`;
@@ -3296,8 +3342,13 @@ async function exportAllJson(){
     const by={}; hls.forEach(h=>(by[h.pdfId]=by[h.pdfId]||[]).push(hlClean(h)));
     pdfs=recs.map(r=>({ id:r.id, name:r.name, subject:r.subject||null, chapter:r.chapter||null, note:r.note||'', addedAt:r.addedAt, highlights:by[r.id]||[] }));
   }}catch(e){}
-  downloadJson({ app:'clinical-quest', kind:'backup', version:5, exportedAt:new Date().toISOString(),
-    userLessons:META.userLessons||[], userQuestions:META.userQuestions||[], userCards:META.userCards||[], manualCards:META.manualCards||[],
+  // inline any IndexedDB-stored images as data-URLs so the backup is self-contained + portable
+  const userQuestions = await Promise.all((META.userQuestions||[]).map(async q=>{
+    if(q.img && q.img.slice(0,4)==='idb:'){ const s=await resolveImgSrc(q.img); return Object.assign({}, q, s?{img:s}:{}); }
+    return q;
+  }));
+  downloadJson({ app:'clinical-quest', kind:'backup', version:6, exportedAt:new Date().toISOString(),
+    userLessons:META.userLessons||[], userQuestions, userCards:META.userCards||[], manualCards:META.manualCards||[],
     srs:META.srs||{}, concepts:META.concepts||{}, lessonsDone:META.lessonsDone||[], notes:META.notes||{}, progress:META.progress||{},
     pdfs }, 'clinical-quest-backup.json');
   showToast('✓ backup exported');
@@ -3333,6 +3384,57 @@ async function importBackupFile(e){
 }
 
 refreshAuthorGate();
+
+/* =====================================================================
+   13) QUESTION IMAGES — an optional `img` on a question/card, shown above
+   the prompt in Battle, Cram, lesson quizzes and Flashcards. `img` may be a
+   data-URL, an https URL, or `idb:<id>` (a large image kept in IndexedDB so
+   it doesn't bloat localStorage). Small images are stored inline; big ones
+   move to IndexedDB automatically. Exports inline idb images as data-URLs.
+   ===================================================================== */
+const IMG_CACHE = {};                                   // idb id -> resolved data-URL
+const IMG_WARN = 2.5*1024*1024, IMG_CAP = 3.5*1024*1024; // localStorage soft warn / offload thresholds
+function saveBytes(){ try{ return (localStorage.getItem(SAVE_KEY)||'').length; }catch(e){ return 0; } }
+function fileToDataUrl(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error||new Error('read failed')); r.readAsDataURL(file); }); }
+function resolveImgSrc(img){
+  if(!img) return Promise.resolve('');
+  if(img.slice(0,4)==='idb:'){ const id=img.slice(4);
+    if(IMG_CACHE[id]!==undefined) return Promise.resolve(IMG_CACHE[id]);
+    return PDFDB.get('images', id).then(r=>{ const s=(r&&r.dataUrl)||''; IMG_CACHE[id]=s; return s; }).catch(()=>'');
+  }
+  return Promise.resolve(img);                          // data: or https:
+}
+/* fill a container with an image above the prompt (used by battle/cram/lesson quiz) */
+function showQImage(sel, img, alt){
+  const c=$(sel); if(!c) return;
+  c.innerHTML=''; if(!img){ c.style.display='none'; return; }
+  c.style.display='';
+  const im=document.createElement('img'); im.className='qimg'; im.alt=alt||'question image';
+  im.onerror=()=>{ c.style.display='none'; };
+  c.appendChild(im);
+  resolveImgSrc(img).then(s=>{ if(s) im.src=s; else c.style.display='none'; });
+}
+/* fill a flashcard face with an optional image + text */
+function renderCardFace(el, img, text){
+  el.innerHTML='';
+  if(img){ const im=document.createElement('img'); im.className='qimg'; im.alt='card image'; im.onerror=()=>im.remove(); el.appendChild(im);
+    resolveImgSrc(img).then(s=>{ if(s) im.src=s; else im.remove(); }); }
+  const d=document.createElement('div'); d.textContent=text; el.appendChild(d);
+}
+/* author: turn a picked file into an `img` value, offloading big ones to IndexedDB */
+async function attachQuestionImage(file){
+  if(!file || !/^image\//.test(file.type||'')) return { err:'Please choose an image file.' };
+  const dataUrl = await fileToDataUrl(file);
+  const projected = saveBytes() + dataUrl.length;
+  if(projected > IMG_CAP && await PDFDB.available()){
+    const id=uid('img-'); await PDFDB.put('images', { id, dataUrl }); IMG_CACHE[id]=dataUrl;
+    return { img:'idb:'+id, note:'Large image — stored in IndexedDB so it won’t bloat local storage.' };
+  }
+  let note='';
+  if(projected > IMG_CAP) note='⚠ Large image and IndexedDB isn’t available (opened via file://). This may exceed the browser storage limit — run from a local server so images can move to IndexedDB.';
+  else if(projected > IMG_WARN) note='⚠ Local storage is filling up with images. Very large ones move to IndexedDB automatically; for many images, run from a local server.';
+  return { img:dataUrl, note };
+}
 
 /* =====================================================================
    12) UNIVERSAL EXIT (bug fix) — every screen can return to select, and
