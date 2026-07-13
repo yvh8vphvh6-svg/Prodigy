@@ -585,6 +585,16 @@
   .csvskip{ font-family:var(--mono); font-size:11px; color:var(--hplow); line-height:1.6; max-height:18vh; overflow:auto; }
   .authnote{ font-size:12px; color:var(--dim); line-height:1.5; }
 
+  /* ---------- universal exit: battle HUD quit button (bug fix) ---------- */
+  .hudquit{ position:absolute; top:calc(10px + env(safe-area-inset-top)); left:max(12px,env(safe-area-inset-left)); z-index:6;
+    font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+    padding:8px 13px; border-radius:10px; border:1px solid var(--glass-brd); background:var(--glass-2);
+    -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); cursor:pointer; box-shadow:var(--shadow-sm);
+    transition:transform .18s var(--ease-out), border-color .2s, color .2s; }
+  .hudquit:hover{ border-color:var(--hplow); color:var(--text); transform:translateY(-1px); }
+  .hudquit:active{ transform:scale(.97); }
+  .hudquit:focus-visible{ outline:3px solid var(--hplow); outline-offset:2px; }
+
   @media (prefers-reduced-motion: reduce){
     *{ animation:none !important; transition:none !important; }
     body::after{ display:none; }        /* drop the animated background glow */
@@ -616,6 +626,7 @@
 
   <!-- ===== BATTLE ===== -->
   <section id="battle" class="screen hidden">
+    <button class="hudquit" id="battleQuit" type="button" aria-label="quit battle">◂ quit</button>
     <div class="arena">
       <div class="enemy-wrap">
         <div class="enemy-bar">
@@ -1242,7 +1253,7 @@ const $ = s => document.querySelector(s);
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const rint = (a,b)=> a + Math.floor(Math.random()*(b-a+1));
 
-const S = { player:null, enemy:null, enemyIndex:0, queue:[], qi:0, answering:false, qStart:0, timer:null, timeLeft:0 };
+const S = { player:null, enemy:null, enemyIndex:0, queue:[], qi:0, answering:false, qStart:0, timer:null, timeLeft:0, token:0 };
 const TIME_PER_Q = 18;
 
 function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; }
@@ -1314,6 +1325,7 @@ function startRun(c){
 }
 
 function startBattle(){
+  S.token = (S.token||0) + 1; // new fight — invalidates any stale spell/victory/defeat callbacks
   S.player.streak = Math.floor(S.player.streak/2); // don't carry a full streak into a fresh fight
   S.enemy = makeEnemy(S.enemyIndex);
   const en = $('#enemy');
@@ -1444,6 +1456,7 @@ function choose(i){ if(S.answering) return; resolve(i); }
 
 function resolve(choiceIndex){
   S.answering = true; clearInterval(S.timer);
+  const tok = S.token; // if the player quits mid-answer, deferred work below is skipped
   const q = currentQ();
   const correct = choiceIndex === q.answer;
   // lock choices, show right/wrong
@@ -1467,12 +1480,13 @@ function resolve(choiceIndex){
     tallyConcept(conceptForQuestion(q), true); // feed the knowledge map
     const el = ELEMENTS[q.subject] || ELEMENTS["A&P"];
     castSpell(el.css, ()=>{
+      if(S.token!==tok) return;   // battle was quit/restarted mid-cast — drop this hit
       SFX.hit(crit);
       hitEnemy();
       floatNum($('#enemy'), (crit?'CRIT ':'')+dmg, crit?'var(--gold)':el.css, crit?30:24);
       renderEnemyHp();
       gainXp(4); gainCoins(3);
-      if(S.enemy.hp<=0){ setTimeout(victory, 620); }
+      if(S.enemy.hp<=0){ setTimeout(()=>{ if(S.token===tok) victory(); }, 620); }
     });
     showRationale(q, true);
   } else {
@@ -1485,7 +1499,7 @@ function resolve(choiceIndex){
     floatNum($('#pav'), '-'+dmg, 'var(--hplow)', 24);
     renderPlayer();
     showRationale(q, false);
-    if(S.player.hp<=0){ setTimeout(defeat, 500); }
+    if(S.player.hp<=0){ setTimeout(()=>{ if(S.token===tok) defeat(); }, 500); }
   }
 }
 
@@ -3319,6 +3333,53 @@ async function importBackupFile(e){
 }
 
 refreshAuthorGate();
+
+/* =====================================================================
+   12) UNIVERSAL EXIT (bug fix) — every screen can return to select, and
+   Escape backs out consistently. Quitting a battle tears down the timer +
+   any in-flight spell/animation (via S.token) and ABANDONS the fight
+   without counting a win; lifetime unlock progress (already saved as you
+   answered) and everything else is kept.
+   ===================================================================== */
+function quitBattle(){
+  S.token = (S.token||0) + 1;                    // invalidate pending castSpell/victory/defeat callbacks
+  clearInterval(S.timer);
+  document.querySelectorAll('.bolt, .float').forEach(el=>el.remove());  // cancel projectiles + floating numbers
+  document.body.classList.remove('hurt','shake');
+  hideOverlay();
+  $('#battle').classList.add('hidden');
+  buildRoster();
+  $('#select').classList.remove('hidden');
+  saveMeta();
+}
+function quitCram(){ clearInterval(CRAM.clock); $('#cram').classList.add('hidden'); buildRoster(); $('#select').classList.remove('hidden'); }
+function libraryEscape(){ // mirror the visible control: reader/quiz → back one level, else → select
+  if(!$('#libReader').classList.contains('hidden') || !$('#libQuiz').classList.contains('hidden')) leaveLibraryContext();
+  else $('#libQuit').click();
+}
+function flashEscape(){ if(FLASH.session){ FLASH.session=null; showDeckList(); } else quitFlash(); }
+$('#battleQuit').addEventListener('click', quitBattle);
+
+/* global Escape: close a self-managing modal (maker/deck/flash-add handle their own),
+   else back out of whatever screen is showing — mirroring each screen's visible control */
+function escOpenModal(){ return ['#maker','#deck','#flashAddModal'].some(id=>{ const el=$(id); return el && !el.classList.contains('hidden'); }); }
+function escapeBack(){
+  if(!$('#settings').classList.contains('hidden')){ $('#settings').classList.add('hidden'); return true; }
+  if(!$('#overlay').classList.contains('hidden')){ $('#ovQuit').click(); return true; }
+  if(!$('#battle').classList.contains('hidden')){ quitBattle(); return true; }
+  if(!$('#cram').classList.contains('hidden')){ quitCram(); return true; }
+  if(!$('#pdf').classList.contains('hidden')){ $('#pdfBack').click(); return true; }
+  if(!$('#library').classList.contains('hidden')){ libraryEscape(); return true; }
+  if(!$('#flash').classList.contains('hidden')){ flashEscape(); return true; }
+  if(!$('#mindmap').classList.contains('hidden')){ $('#mapQuit').click(); return true; }
+  if(!$('#author').classList.contains('hidden')){ $('#authQuit').click(); return true; }
+  return false;
+}
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Escape') return;
+  if(escOpenModal()) return;              // capture phase: check BEFORE those modals' own Escape handlers close them
+  if(escapeBack()) e.preventDefault();
+}, true);                                 // capture, so this runs before per-screen keydown handlers
 
 /* =====================================================================
    ROADMAP HOOKS for Claude Code (build these next, in your repo):
